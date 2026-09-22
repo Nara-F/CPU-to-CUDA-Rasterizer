@@ -1,0 +1,10 @@
+/build*/
+/out/
+*.ppm
+*.pgm
+*.o
+*.obj.tmp
+*.nsys-rep
+*.ncu-rep
+*.qdrep
+.cache/

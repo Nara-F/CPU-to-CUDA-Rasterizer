@@ -1,4 +1,7 @@
-#include "minigpu.hpp"
+#include <stdexcept>
+
+#include "cuda_backend.hpp"
+#include "rasterizer.hpp"
 
 namespace minigpu {
 

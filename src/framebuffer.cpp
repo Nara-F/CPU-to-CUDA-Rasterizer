@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <fstream>
 #include <limits>
+#include <stdexcept>
+#include <string>
 
-#include "minigpu.hpp"
+#include "framebuffer.hpp"
 
 namespace minigpu {
 

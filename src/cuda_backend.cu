@@ -1,4 +1,6 @@
-#include "minigpu.hpp"
+#include <stdexcept>
+
+#include "cuda_backend.hpp"
 
 namespace minigpu {
 

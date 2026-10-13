@@ -36,4 +36,8 @@ if(BUILD_TESTING)
   add_executable(minigpu_smoke tests/smoke.cpp)
   target_link_libraries(minigpu_smoke PRIVATE minigpu_core)
   add_test(NAME minigpu_smoke COMMAND minigpu_smoke)
+
+  add_executable(minigpu_framebuffer_test tests/framebuffer_test.cpp)
+  target_link_libraries(minigpu_framebuffer_test PRIVATE minigpu_core)
+  add_test(NAME minigpu_framebuffer_test COMMAND minigpu_framebuffer_test)
 endif()

@@ -5,12 +5,14 @@
 
 #include "minigpu.hpp"
 
+namespace {
 void check(bool condition, const char* message) {
     if (!condition) {
         std::cerr << "smoke: " << message << '\n';
         std::exit(1);
     }
 }
+}  // namespace
 
 int main() {
     minigpu::Framebuffer fb(3, 2, {1, 2, 3, 255});

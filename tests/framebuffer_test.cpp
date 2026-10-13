@@ -83,8 +83,11 @@ void test_invalid_construction() {
 }
 
 void test_framebuffer_clear(minigpu::Framebuffer& fb, std::mt19937& gen) {
-    std::uniform_int_distribution<std::uint8_t> channel(0, 255);
-    const minigpu::Color clear = {channel(gen), channel(gen), channel(gen), 255};
+    std::uniform_int_distribution<int> channel(0, 255);
+    const minigpu::Color clear = {
+        static_cast<std::uint8_t>(channel(gen)),
+        static_cast<std::uint8_t>(channel(gen)),
+        static_cast<std::uint8_t>(channel(gen)), 255};
     fb.clear(clear);
     check_all_pixels(fb, clear, "test_framebuffer_clear");
 }
@@ -160,14 +163,15 @@ int main() {
     try {
         constexpr int seed = 1027;
         std::mt19937 gen(seed);
-        std::uint8_t r = std::uniform_int_distribution<std::uint8_t>(0, 255)(gen);
-        std::uint8_t g = std::uniform_int_distribution<std::uint8_t>(0, 255)(gen);
-        std::uint8_t b = std::uniform_int_distribution<std::uint8_t>(0, 255)(gen);
+        std::uniform_int_distribution<int> channel(0, 255);
+        std::uint8_t r = static_cast<std::uint8_t>(channel(gen));
+        std::uint8_t g = static_cast<std::uint8_t>(channel(gen));
+        std::uint8_t b = static_cast<std::uint8_t>(channel(gen));
 
-        std::uint32_t width =
-            std::uniform_int_distribution<std::uint32_t>(1, 1440)(gen);
-        std::uint32_t height =
-            std::uniform_int_distribution<std::uint32_t>(1, 2560)(gen);
+        std::uint32_t width = static_cast<std::uint32_t>(
+            std::uniform_int_distribution<int>(1, 1440)(gen));
+        std::uint32_t height = static_cast<std::uint32_t>(
+            std::uniform_int_distribution<int>(1, 2560)(gen));
 
         test_invalid_construction();
         auto fb = test_framebuffer_constructor(width, height, {r, g, b, 255});

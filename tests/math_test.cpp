@@ -1,0 +1,208 @@
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+
+#include "minigpu.hpp"
+
+namespace {
+
+constexpr float kTolerance = 1e-6f;
+
+void check(bool condition, const std::string& message) {
+    if (!condition) throw std::runtime_error(message);
+}
+
+
+std::array<float, 1> components(float value) { return {value}; }
+
+std::array<float, 3> components(const minigpu::Vec3& v) {
+    return {v.x, v.y, v.z};
+}
+
+std::array<float, 4> components(const minigpu::Vec4& v) {
+    return {v.x, v.y, v.z, v.w};
+}
+
+std::array<float, 16> components(const minigpu::Mat4& m) {
+    std::array<float, 16> parts{};
+    for (int column = 0; column < 4; ++column) {
+        for (int row = 0; row < 4; ++row)
+            parts[static_cast<std::size_t>(column) * 4 + row] =
+                m.m[column][row];
+    }
+    return parts;
+}
+
+template <typename Value>
+std::string component_label(std::size_t index) {
+    if constexpr (std::is_same_v<Value, minigpu::Mat4>) {
+        std::ostringstream where;
+        where << " at [" << index / 4 << "][" << index % 4 << "]";
+        return where.str();
+    } else if constexpr (std::is_same_v<Value, float>) {
+        (void)index;
+        return {};
+    } else {
+        static constexpr const char* kNames[] = {"x", "y", "z", "w"};
+        return std::string(" (") + kNames[index] + ")";
+    }
+}
+
+template <typename Value>
+void check_close(const Value& actual, const Value& expected,
+                 const std::string& message) {
+    const auto actual_parts = components(actual);
+    const auto expected_parts = components(expected);
+    for (std::size_t i = 0; i < actual_parts.size(); ++i) {
+        if (std::fabs(actual_parts[i] - expected_parts[i]) <= kTolerance)
+            continue;
+        std::ostringstream error;
+        error << message << component_label<Value>(i) << ": expected "
+              << expected_parts[i] << ", got " << actual_parts[i];
+        throw std::runtime_error(error.str());
+    }
+}
+
+minigpu::Mat4 distinct_entries() {
+    minigpu::Mat4 matrix;
+    for (int column = 0; column < 4; ++column) {
+        for (int row = 0; row < 4; ++row)
+            matrix.m[column][row] = static_cast<float>(column * 10 + row);
+    }
+    return matrix;
+}
+
+void test_identity() {
+    const minigpu::Mat4 identity;
+    for (int column = 0; column < 4; ++column) {
+        for (int row = 0; row < 4; ++row) {
+            std::ostringstream where;
+            where << "Mat4{} default at [" << column << "][" << row << "]";
+            check_close(identity.m[column][row],
+                        column == row ? 1.0f : 0.0f, where.str());
+        }
+    }
+
+    check_close(identity * identity, identity, "identity * identity");
+
+    const minigpu::Vec4 samples[] = {{0.0f, 0.0f, 0.0f, 1.0f},
+                                     {1.0f, 2.0f, 3.0f, 1.0f},
+                                     {-4.0f, 5.0f, -6.0f, 7.0f}};
+    for (const minigpu::Vec4& v : samples)
+        check_close(identity * v, v, "identity * v");
+}
+
+void test_translation() {
+    const minigpu::Mat4 matrix = minigpu::translation({2.5f, -1.0f, 4.0f});
+    check_close(matrix * minigpu::Vec4{1.0f, 1.0f, 1.0f, 1.0f},
+                minigpu::Vec4{3.5f, 0.0f, 5.0f, 1.0f}, "translation moves a point");
+    check_close(matrix * minigpu::Vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                minigpu::Vec4{2.5f, -1.0f, 4.0f, 1.0f}, "translation of the origin");
+    check_close(matrix * minigpu::Vec4{1.0f, 0.0f, 0.0f, 0.0f},
+                minigpu::Vec4{1.0f, 0.0f, 0.0f, 0.0f},
+                "translation leaves directions alone");
+}
+
+void test_translation_composition() {
+    const minigpu::Vec3 a = {1.0f, 2.0f, 3.0f};
+    const minigpu::Vec3 b = {-4.0f, 0.5f, 2.0f};
+    const minigpu::Vec3 sum = {a.x + b.x, a.y + b.y, a.z + b.z};
+    check_close(minigpu::translation(a) * minigpu::translation(b),
+                minigpu::translation(sum),
+                "translations compose by adding their offsets");
+}
+
+void test_column_major_layout() {
+    const minigpu::Mat4 t = minigpu::translation({7.0f, 8.0f, 9.0f});
+    check_close(t.m[3][0], 7.0f, "translation x lives at m[3][0]");
+    check_close(t.m[3][1], 8.0f, "translation y lives at m[3][1]");
+    check_close(t.m[3][2], 9.0f, "translation z lives at m[3][2]");
+    check_close(t.m[3][3], 1.0f, "m[3][3] stays 1");
+    check_close(t.m[0][3], 0.0f, "m[0][3] stays 0");
+    check_close(t.m[1][3], 0.0f, "m[1][3] stays 0");
+    check_close(t.m[2][3], 0.0f, "m[2][3] stays 0");
+    check_close(distinct_entries() * minigpu::Vec4{1.0f, 2.0f, 3.0f, 4.0f},
+                minigpu::Vec4{200.0f, 210.0f, 220.0f, 230.0f},
+                "column-major M * v");
+}
+
+void test_matrix_product() {
+    const minigpu::Mat4 m = distinct_entries();
+    const minigpu::Mat4 identity;
+    check_close(m * identity, m, "M * identity");
+    check_close(identity * m, m, "identity * M");
+    const minigpu::Vec4 v = {1.0f, 2.0f, 3.0f, 4.0f};
+    const minigpu::Mat4 t = minigpu::translation({5.0f, 6.0f, 7.0f});
+    check_close(t * (m * v), (t * m) * v, "(T * M) * v equals T * (M * v)");
+}
+
+void test_vector_operations() {
+    check_close(minigpu::dot({1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}), 0.0f,
+                "dot of perpendicular axes");
+    check_close(minigpu::dot({1.0f, 2.0f, 3.0f}, {4.0f, 5.0f, 6.0f}), 32.0f,
+                "dot of general vectors");
+
+    const minigpu::Vec3 x = {1.0f, 0.0f, 0.0f};
+    const minigpu::Vec3 y = {0.0f, 1.0f, 0.0f};
+    check_close(minigpu::cross(x, y), minigpu::Vec3{0.0f, 0.0f, 1.0f},
+                "x cross y is +z");
+    check_close(minigpu::cross(y, x), minigpu::Vec3{0.0f, 0.0f, -1.0f},
+                "cross is antisymmetric");
+    check_close(minigpu::cross({1.0f, 2.0f, 3.0f}, {4.0f, 5.0f, 6.0f}),
+                minigpu::Vec3{-3.0f, 6.0f, -3.0f}, "cross of general vectors");
+
+    check_close(minigpu::length({3.0f, 4.0f, 0.0f}), 5.0f, "length");
+
+    check_close(minigpu::normalize({0.0f, 0.0f, 5.0f}),
+                minigpu::Vec3{0.0f, 0.0f, 1.0f}, "normalize keeps the direction");
+    check_close(minigpu::length(minigpu::normalize({2.0f, -3.0f, 6.0f})), 1.0f,
+                "normalize returns a unit vector");
+}
+
+void test_vector_arithmetic() {
+    const minigpu::Vec3 a = {1.0f, 2.0f, 3.0f};
+    const minigpu::Vec3 b = {4.0f, -5.0f, 6.0f};
+
+    check_close(a + b, minigpu::Vec3{5.0f, -3.0f, 9.0f}, "vector addition");
+    check_close(a - b, minigpu::Vec3{-3.0f, 7.0f, -3.0f}, "vector subtraction");
+    check_close(-a, minigpu::Vec3{-1.0f, -2.0f, -3.0f}, "unary minus");
+    check_close(a * 2.0f, minigpu::Vec3{2.0f, 4.0f, 6.0f},
+                "vector times scalar");
+    check_close(2.0f * a, minigpu::Vec3{2.0f, 4.0f, 6.0f},
+                "scalar times vector");
+    check_close((a + b) - b, a, "addition and subtraction cancel");
+}
+
+void test_normalize_rejects_zero_length() {
+    bool thrown = false;
+    try {
+        (void)minigpu::normalize({0.0f, 0.0f, 0.0f});
+    } catch (const std::invalid_argument&) {
+        thrown = true;
+    }
+    check(thrown, "normalize of the zero vector must throw std::invalid_argument");
+}
+
+}  // namespace
+
+int main() {
+    try {
+        test_identity();
+        test_translation();
+        test_translation_composition();
+        test_column_major_layout();
+        test_matrix_product();
+        test_vector_operations();
+        test_vector_arithmetic();
+        test_normalize_rejects_zero_length();
+    } catch (const std::exception& error) {
+        std::cerr << "math_test: " << error.what() << '\n';
+        return 1;
+    }
+    return 0;
+}

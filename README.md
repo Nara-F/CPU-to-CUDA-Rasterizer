@@ -8,12 +8,25 @@
 
 需要 CMake 3.18+ 和支持 C++17 的编译器。CPU 路径不依赖 CUDA、窗口系统或第三方库。
 
+Linux / WSL：
+
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
 ./build/minigpu --output starter.ppm
 ```
+
+Windows PowerShell（Visual Studio / MSVC）：
+
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022"
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
+.\build\Release\minigpu.exe --output starter.ppm
+```
+
+Windows 与 WSL 可以共用源码，但必须使用不同的构建目录；CMake 缓存记录了系统路径、编译器和生成器，不能跨系统复用。Visual Studio 生成器需要通过 `--config` 和 `-C` 指定配置，`CMAKE_BUILD_TYPE` 不控制它的构建配置。若已构建 Debug，测试时使用 `-C Debug`。
 
 默认 `--backend starter` 仅输出背景；`--backend cpu`、`cuda-naive`、`cuda-tiled` 是后续 lab 的实现入口，当前明确报错。用 `--help` 查看尺寸和输出参数。
 

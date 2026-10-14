@@ -6,6 +6,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+if(MSVC)
+  # 源文件是 UTF-8（含中文注释）。MSVC 默认按本地代码页解析，中文会被当成
+  # 非法字符并引发成片的语法错误，必须显式指定源码与执行字符集。
+  # 只作用于 C++，避免把 /utf-8 直接丢给 nvcc。
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
+endif()
+
 if(MINIGPU_ENABLE_CUDA)
   include(CheckLanguage)
   check_language(CUDA)
@@ -16,7 +23,7 @@ if(MINIGPU_ENABLE_CUDA)
   set(CMAKE_CUDA_STANDARD 17)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
-add_library(minigpu_core src/framebuffer.cpp src/rasterizer.cpp)
+add_library(minigpu_core src/framebuffer.cpp src/math.cpp src/rasterizer.cpp)
 target_include_directories(minigpu_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(minigpu_core PUBLIC cxx_std_17)
 
@@ -40,4 +47,8 @@ if(BUILD_TESTING)
   add_executable(minigpu_framebuffer_test tests/framebuffer_test.cpp)
   target_link_libraries(minigpu_framebuffer_test PRIVATE minigpu_core)
   add_test(NAME minigpu_framebuffer_test COMMAND minigpu_framebuffer_test)
+
+  add_executable(minigpu_math_test tests/math_test.cpp)
+  target_link_libraries(minigpu_math_test PRIVATE minigpu_core)
+  add_test(NAME minigpu_math_test COMMAND minigpu_math_test)
 endif()

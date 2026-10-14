@@ -52,5 +52,6 @@ int main() {
                   static_cast<unsigned char>(payload[i + 2]) == 30,
               "PPM RGB payload");
     }
+    in.close();
     std::filesystem::remove(path);
 }

@@ -23,7 +23,8 @@ if(MINIGPU_ENABLE_CUDA)
   set(CMAKE_CUDA_STANDARD 17)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
-add_library(minigpu_core src/framebuffer.cpp src/math.cpp src/rasterizer.cpp)
+add_library(minigpu_core src/framebuffer.cpp src/math.cpp src/raster_math.cpp
+                          src/rasterizer.cpp)
 target_include_directories(minigpu_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(minigpu_core PUBLIC cxx_std_17)
 
@@ -51,4 +52,8 @@ if(BUILD_TESTING)
   add_executable(minigpu_math_test tests/math_test.cpp)
   target_link_libraries(minigpu_math_test PRIVATE minigpu_core)
   add_test(NAME minigpu_math_test COMMAND minigpu_math_test)
+
+  add_executable(minigpu_raster_math_test tests/raster_math_test.cpp)
+  target_link_libraries(minigpu_raster_math_test PRIVATE minigpu_core)
+  add_test(NAME minigpu_raster_math_test COMMAND minigpu_raster_math_test)
 endif()

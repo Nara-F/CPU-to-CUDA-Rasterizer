@@ -20,10 +20,10 @@ float length(const Vec3& v);
 // v 为零向量时抛 std::invalid_argument
 Vec3 normalize(const Vec3& v);
 
-//向量运算符重载
+// 向量运算符重载
 Vec3 operator+(const Vec3& a, const Vec3& b);
 Vec3 operator-(const Vec3& a, const Vec3& b);
-Vec3 operator-(const Vec3& v);//取负
+Vec3 operator-(const Vec3& v);  // 取负
 Vec3 operator*(const Vec3& v, float scalar);
 Vec3 operator*(float scalar, const Vec3& v);
 
@@ -38,7 +38,7 @@ struct Mat4 {
 // 平移 t；旋转和缩放保持单位矩阵
 Mat4 translation(const Vec3& v);
 
-// 矩阵乘法，矩阵和列向量乘法 
+// 矩阵乘法，矩阵和列向量乘法
 Mat4 operator*(const Mat4& a, const Mat4& b);
 Vec4 operator*(const Mat4& a, const Vec4& v);
 

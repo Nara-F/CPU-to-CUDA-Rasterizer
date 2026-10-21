@@ -17,8 +17,7 @@ class TemporaryDirectory {
         std::random_device generator;
         do {
             path_ = std::filesystem::temp_directory_path() /
-                    ("minigpu_framebuffer_test_" +
-                     std::to_string(generator()));
+                    ("minigpu_framebuffer_test_" + std::to_string(generator()));
         } while (!std::filesystem::create_directory(path_));
     }
 
@@ -84,12 +83,36 @@ void test_invalid_construction() {
 
 void test_framebuffer_clear(minigpu::Framebuffer& fb, std::mt19937& gen) {
     std::uniform_int_distribution<int> channel(0, 255);
-    const minigpu::Color clear = {
-        static_cast<std::uint8_t>(channel(gen)),
-        static_cast<std::uint8_t>(channel(gen)),
-        static_cast<std::uint8_t>(channel(gen)), 255};
+    const minigpu::Color clear = {static_cast<std::uint8_t>(channel(gen)),
+                                  static_cast<std::uint8_t>(channel(gen)),
+                                  static_cast<std::uint8_t>(channel(gen)), 255};
     fb.clear(clear);
     check_all_pixels(fb, clear, "test_framebuffer_clear");
+}
+
+void test_frambuffer_set_pixel(minigpu::Framebuffer& fb, std::mt19937& gen) {
+    std::uniform_int_distribution<std::uint32_t> x_dist(0, fb.width() - 1);
+    std::uniform_int_distribution<std::uint32_t> y_dist(0, fb.height() - 1);
+    std::uniform_int_distribution<int> channel(0, 255);
+
+    const std::uint32_t x = x_dist(gen);
+    const std::uint32_t y = y_dist(gen);
+    const minigpu::Color color = {static_cast<std::uint8_t>(channel(gen)),
+                                  static_cast<std::uint8_t>(channel(gen)),
+                                  static_cast<std::uint8_t>(channel(gen)), 255};
+    fb.set_pixel(x, y, color);
+
+    const auto& pixel = fb.at(x, y);
+    if (pixel.r != color.r || pixel.g != color.g || pixel.b != color.b ||
+        pixel.a != color.a) {
+        throw std::runtime_error(
+            "test_framebuffer_set_pixel failed: expected RGBA (" +
+            std::to_string(color.r) + ", " + std::to_string(color.g) + ", " +
+            std::to_string(color.b) + ", " + std::to_string(color.a) +
+            "), got (" + std::to_string(pixel.r) + ", " +
+            std::to_string(pixel.g) + ", " + std::to_string(pixel.b) + ", " +
+            std::to_string(pixel.a) + ")");
+    }
 }
 
 void test_framebuffer_write_ppm(const minigpu::Framebuffer& fb,
@@ -98,8 +121,7 @@ void test_framebuffer_write_ppm(const minigpu::Framebuffer& fb,
     fb.write_ppm(path);
     std::ifstream in(path, std::ios::binary);
     if (!in) {
-        throw std::runtime_error(
-            "cannot open PPM output: " + path.string());
+        throw std::runtime_error("cannot open PPM output: " + path.string());
     }
 
     std::string header;
@@ -111,23 +133,20 @@ void test_framebuffer_write_ppm(const minigpu::Framebuffer& fb,
     if (header !=
         std::to_string(fb.width()) + " " + std::to_string(fb.height())) {
         throw std::runtime_error(
-            "expected PPM dimensions " +
-            std::to_string(fb.width()) + " " + std::to_string(fb.height()) +
-            ", got " + header);
+            "expected PPM dimensions " + std::to_string(fb.width()) + " " +
+            std::to_string(fb.height()) + ", got " + header);
     }
     std::getline(in, header);
     if (header != "255") {
-        throw std::runtime_error(
-            "expected PPM max value 255, got " + header);
+        throw std::runtime_error("expected PPM max value 255, got " + header);
     }
     std::string payload((std::istreambuf_iterator<char>(in)), {});
     const std::size_t expected_size =
         static_cast<std::size_t>(fb.width()) * fb.height() * 3;
     if (payload.size() != expected_size) {
-        throw std::runtime_error(
-            "expected PPM payload size " +
-            std::to_string(expected_size) + ", got " +
-            std::to_string(payload.size()));
+        throw std::runtime_error("expected PPM payload size " +
+                                 std::to_string(expected_size) + ", got " +
+                                 std::to_string(payload.size()));
     }
     for (std::uint32_t y = 0; y < fb.height(); ++y) {
         for (std::uint32_t x = 0; x < fb.width(); ++x) {
@@ -137,9 +156,9 @@ void test_framebuffer_write_ppm(const minigpu::Framebuffer& fb,
             if (static_cast<unsigned char>(payload[offset]) != pixel.r ||
                 static_cast<unsigned char>(payload[offset + 1]) != pixel.g ||
                 static_cast<unsigned char>(payload[offset + 2]) != pixel.b) {
-                throw std::runtime_error(
-                    "PPM RGB mismatch at (" +
-                    std::to_string(x) + ", " + std::to_string(y) + ")");
+                throw std::runtime_error("PPM RGB mismatch at (" +
+                                         std::to_string(x) + ", " +
+                                         std::to_string(y) + ")");
             }
         }
     }

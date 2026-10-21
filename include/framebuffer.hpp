@@ -16,6 +16,7 @@ class Framebuffer {
     Color& at(std::uint32_t x, std::uint32_t y);
     const Color& at(std::uint32_t x, std::uint32_t y) const;
     void clear(Color color);
+    void set_pixel(std::uint32_t x, std::uint32_t y, Color color);
     void write_ppm(const std::filesystem::path& path) const;
 
    private:

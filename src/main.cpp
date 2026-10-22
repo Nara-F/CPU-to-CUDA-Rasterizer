@@ -63,7 +63,16 @@ int main(int argc, char** argv) {
             rasterizer.draw_clear({24, 32, 48, 255});
         } else if (backend == "cpu") {
             minigpu::CpuRasterizer rasterizer(framebuffer);
-            rasterizer.draw_triangle({});
+            minigpu::Triangle triangle1(
+                {{{0, 0, 0.5f}, {255, 0, 0, 255}},
+                 {{width - 1, 0, 0.5f}, {0, 255, 0, 255}},
+                 {{0, height - 1, 0.5f}, {0, 0, 255, 255}}});
+            minigpu::Triangle triangle2(
+                {{{width - 1, 0, 0.5f}, {255, 0, 0, 255}},
+                 {{width - 1, height - 1, 0.5f}, {0, 255, 0, 255}},
+                 {{0, height - 1, 0.5f}, {0, 0, 255, 255}}});
+            rasterizer.draw_triangle(triangle1);
+            rasterizer.draw_triangle_scanLine(triangle2);
         } else if (backend == "cuda-naive") {
             minigpu::run_cuda_demo(framebuffer);
         } else if (backend == "cuda-tiled") {

@@ -88,6 +88,51 @@ void test_degenerate(const TriangleImplementation& implementation) {
                      [](unsigned, unsigned) { return false; });
 }
 
+void test_color_interpolation_orders(
+    const TriangleImplementation& implementation) {
+    const std::array<minigpu::ScreenVertex, 3> vertices = {{
+        {{1, 1, 0.5f}, {255, 0, 0, 255}},
+        {{5, 1, 0.5f}, {0, 255, 0, 255}},
+        {{1, 5, 0.5f}, {0, 0, 255, 255}},
+    }};
+    struct Sample {
+        unsigned x, y;
+        minigpu::Color expected;
+    };
+    // At pixel centers: w1 = (x + 0.5 - 1) / 4,
+    // w2 = (y + 0.5 - 1) / 4, w0 = 1 - w1 - w2.
+    // Fixed expectations avoid relying on the implementation's barycentrics.
+    const Sample samples[] = {
+        {1, 1, {191, 31, 31, 255}},
+        {3, 1, {63, 159, 31, 255}},
+        {1, 3, {63, 31, 159, 255}},
+    };
+    std::array<int, 3> order{0, 1, 2};
+    do {
+        minigpu::Framebuffer fb(8, 8, kBackground);
+        implementation.draw(fb, {vertices[order[0]], vertices[order[1]],
+                                 vertices[order[2]]});
+        for (const auto& sample : samples) {
+            const auto got = fb.at(sample.x, sample.y);
+            const auto want = sample.expected;
+            const auto close = [](int actual, int expected) {
+                return actual >= expected - 1 && actual <= expected + 1;
+            };
+            if (!close(got.r, want.r) || !close(got.g, want.g) ||
+                !close(got.b, want.b) || got.a != want.a) {
+                std::ostringstream error;
+                error << "color interpolation order " << order[0] << order[1]
+                      << order[2] << " at pixel (" << sample.x << ',' << sample.y
+                      << "): expected RGBA (" << int(want.r) << ','
+                      << int(want.g) << ',' << int(want.b) << ',' << int(want.a)
+                      << "), got (" << int(got.r) << ',' << int(got.g) << ','
+                      << int(got.b) << ',' << int(got.a) << ')';
+                throw std::runtime_error(error.str());
+            }
+        }
+    } while (std::next_permutation(order.begin(), order.end()));
+}
+
 void test_flat_edges_and_pixel_centers(
     const TriangleImplementation& implementation) {
     check_orders(implementation, {{{1, 1, 0.5f}, {5, 1, 0.5f}, {1, 5, 0.5f}}},
@@ -113,37 +158,39 @@ void test_flat_edges_and_pixel_centers(
 }
 
 void test_nonfinite_coordinates(const TriangleImplementation& implementation) {
-    const auto check_rejected_orders = [&](
-        const std::array<minigpu::Vec3, 3>& positions, const std::string& name) {
-        std::array<int, 3> order{0, 1, 2};
-        do {
-            minigpu::Framebuffer fb(8, 8, kBackground);
-            const auto case_name =
-                name + " order " + std::to_string(order[0]) +
-                std::to_string(order[1]) + std::to_string(order[2]);
-            bool threw = false;
-            try {
-                implementation.draw(
-                    fb, triangle({positions[order[0]], positions[order[1]],
-                                  positions[order[2]]}));
-            } catch (const std::runtime_error&) {
-                threw = true;
-            }
-            if (!threw)
-                throw std::runtime_error(case_name + ": expected runtime_error");
-            check_pixels(fb, case_name,
-                         [](unsigned, unsigned) { return false; });
-        } while (std::next_permutation(order.begin(), order.end()));
-    };
+    const auto check_rejected_orders =
+        [&](const std::array<minigpu::Vec3, 3>& positions,
+            const std::string& name) {
+            std::array<int, 3> order{0, 1, 2};
+            do {
+                minigpu::Framebuffer fb(8, 8, kBackground);
+                const auto case_name =
+                    name + " order " + std::to_string(order[0]) +
+                    std::to_string(order[1]) + std::to_string(order[2]);
+                bool threw = false;
+                try {
+                    implementation.draw(
+                        fb, triangle({positions[order[0]], positions[order[1]],
+                                      positions[order[2]]}));
+                } catch (const std::runtime_error&) {
+                    threw = true;
+                }
+                if (!threw)
+                    throw std::runtime_error(case_name +
+                                             ": expected runtime_error");
+                check_pixels(fb, case_name,
+                             [](unsigned, unsigned) { return false; });
+            } while (std::next_permutation(order.begin(), order.end()));
+        };
 
     const float bad[] = {std::numeric_limits<float>::quiet_NaN(),
                          std::numeric_limits<float>::infinity(),
                          -std::numeric_limits<float>::infinity()};
     for (float value : bad) {
-        check_rejected_orders(
-            {{{value, 1, 0.5f}, {5, 1, 0.5f}, {1, 5, 0.5f}}}, "nonfinite x");
-        check_rejected_orders(
-            {{{1, value, 0.5f}, {5, 1, 0.5f}, {1, 5, 0.5f}}}, "nonfinite y");
+        check_rejected_orders({{{value, 1, 0.5f}, {5, 1, 0.5f}, {1, 5, 0.5f}}},
+                              "nonfinite x");
+        check_rejected_orders({{{1, value, 0.5f}, {5, 1, 0.5f}, {1, 5, 0.5f}}},
+                              "nonfinite y");
     }
 }
 
@@ -204,6 +251,7 @@ void test_export_ppm(const TriangleImplementation& implementation) {
                                {{1000, 0, 0.5f}, {0, 255, 0, 255}},
                                {{0, 1000, 0.5f}, {0, 0, 255, 255}}});
     implementation.draw(fb, testTri);
+    std::filesystem::create_directories(std::filesystem::absolute("testPPM"));
     const auto path = std::filesystem::absolute(
         "testPPM/" + std::string("triangle_") + implementation.name + ".ppm");
     rasterizer.export_ppm(fb, path);
@@ -220,6 +268,7 @@ int main() {
             test_rectangle_fill(implementation);
             test_degenerate(implementation);
             test_flat_edges_and_pixel_centers(implementation);
+            test_color_interpolation_orders(implementation);
             test_nonfinite_coordinates(implementation);
             test_export_ppm(implementation);
         } catch (const std::exception& error) {

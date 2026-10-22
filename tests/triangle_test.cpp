@@ -113,16 +113,37 @@ void test_flat_edges_and_pixel_centers(
 }
 
 void test_nonfinite_coordinates(const TriangleImplementation& implementation) {
+    const auto check_rejected_orders = [&](
+        const std::array<minigpu::Vec3, 3>& positions, const std::string& name) {
+        std::array<int, 3> order{0, 1, 2};
+        do {
+            minigpu::Framebuffer fb(8, 8, kBackground);
+            const auto case_name =
+                name + " order " + std::to_string(order[0]) +
+                std::to_string(order[1]) + std::to_string(order[2]);
+            bool threw = false;
+            try {
+                implementation.draw(
+                    fb, triangle({positions[order[0]], positions[order[1]],
+                                  positions[order[2]]}));
+            } catch (const std::runtime_error&) {
+                threw = true;
+            }
+            if (!threw)
+                throw std::runtime_error(case_name + ": expected runtime_error");
+            check_pixels(fb, case_name,
+                         [](unsigned, unsigned) { return false; });
+        } while (std::next_permutation(order.begin(), order.end()));
+    };
+
     const float bad[] = {std::numeric_limits<float>::quiet_NaN(),
                          std::numeric_limits<float>::infinity(),
                          -std::numeric_limits<float>::infinity()};
     for (float value : bad) {
-        check_orders(implementation,
-                     {{{value, 1, 0.5f}, {5, 1, 0.5f}, {1, 5, 0.5f}}},
-                     "nonfinite x", [](unsigned, unsigned) { return false; });
-        check_orders(implementation,
-                     {{{1, value, 0.5f}, {5, 1, 0.5f}, {1, 5, 0.5f}}},
-                     "nonfinite y", [](unsigned, unsigned) { return false; });
+        check_rejected_orders(
+            {{{value, 1, 0.5f}, {5, 1, 0.5f}, {1, 5, 0.5f}}}, "nonfinite x");
+        check_rejected_orders(
+            {{{1, value, 0.5f}, {5, 1, 0.5f}, {1, 5, 0.5f}}}, "nonfinite y");
     }
 }
 

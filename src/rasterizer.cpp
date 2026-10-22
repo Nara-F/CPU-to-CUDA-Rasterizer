@@ -1,5 +1,6 @@
 #include "rasterizer.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <utility>
@@ -25,43 +26,88 @@ minigpu::Color interpolate_color(const minigpu::Triangle& tri,
         tri.a.color.b * bc.w0 + tri.b.color.b * bc.w1 + tri.c.color.b * bc.w2;
     return result;
 }
+
+bool has_invalid_vertex(const minigpu::Triangle& triangle) {
+    const auto& a = triangle.a.position;
+    const auto& b = triangle.b.position;
+    const auto& c = triangle.c.position;
+    bool badA =
+        !std::isfinite(a.x) || !std::isfinite(a.y) || !std::isfinite(a.z);
+    bool badB =
+        !std::isfinite(b.x) || !std::isfinite(b.y) || !std::isfinite(b.z);
+    bool badC =
+        !std::isfinite(c.x) || !std::isfinite(c.y) || !std::isfinite(c.z);
+    return badA || badB || badC;
+}
+
+int32_t validate_cast_boundary(float value, const minigpu::Framebuffer& fb,
+                               const std::string& name) {
+    int32_t ret;
+    if (!std::isfinite(value)) {
+        throw std::runtime_error(
+            name + " value is not finite: " + std::to_string(value));
+    }
+    value = ceil(value - 0.5f);
+    value =
+        std::clamp(value, 0.0f,
+                   static_cast<float>(std::numeric_limits<int32_t>::max() - 1));
+    ret = static_cast<int32_t>(value);
+    if (name == "width" && ret >= fb.width()) ret = fb.width();
+    if (name == "height" && ret >= fb.height()) ret = fb.height();
+    return ret;
+}
 }  // namespace
 namespace minigpu {
 
-void CpuRasterizer::draw_triangle(const Triangle&) {
-    throw std::logic_error(
-        "CPU triangle rasterization is a lab TODO (barycentrics, depth, "
-        "interpolation)");
+void CpuRasterizer::draw_triangle(const Triangle& triangle) {
+    if (has_invalid_vertex(triangle)) {
+        throw std::runtime_error("Triangle has invalid vertex");
+    }
+    if (minigpu::is_degenerate(triangle)) return;
+
+    auto bounds = minigpu::triangle_bounds(triangle);
+    auto& [min_x, min_y, max_x, max_y] = bounds;
+
+    int32_t x_begin = validate_cast_boundary(min_x, target_, "width");
+    int32_t x_end = validate_cast_boundary(max_x, target_, "width");
+    int32_t y_begin = validate_cast_boundary(min_y, target_, "height");
+    int32_t y_end = validate_cast_boundary(max_y, target_, "height");
+
+    for (int32_t y = y_begin; y < y_end; ++y) {
+        for (int32_t x = x_begin; x < x_end; ++x) {
+            Vec3 p{x + 0.5f, y + 0.5f, 0.0f};
+            if (minigpu::cover_pixel(triangle, p)) {
+                auto bc = minigpu::barycentric(triangle.a.position,
+                                               triangle.b.position,
+                                               triangle.c.position, p);
+                auto c = interpolate_color(triangle, bc);
+                target_.set_pixel(x, y, c);
+            }
+        }
+    }
 }
 
 void minigpu::CpuRasterizer::draw_triangle_scanLine(const Triangle& triangle) {
+    if (has_invalid_vertex(triangle)) {
+        throw std::runtime_error("Triangle has invalid vertex");
+    }
+
     auto [v1, c1] = triangle.a;
     auto [v2, c2] = triangle.b;
     auto [v3, c3] = triangle.c;
 
-    // Reject invalid screen coordinates before division or integer conversion.
-    const auto finite_xy = [](const Vec3& v) {
-        return std::isfinite(v.x) && std::isfinite(v.y);
-    };
-    if (!finite_xy(v1) || !finite_xy(v2) || !finite_xy(v3)) return;
-
-    // Reuse the shared zero-area rule: horizontal/vertical/diagonal
-    // collinearity and every combination of coincident vertices are all
-    // degenerate in x/y.
-    if (!std::isfinite(signed_area(v1, v2, v3)) || is_degenerate(triangle))
-        return;
+    if (is_degenerate(triangle)) return;
 
     if (v1.y > v2.y) std::swap(v1, v2), std::swap(c1, c2);
     if (v1.y > v3.y) std::swap(v1, v3), std::swap(c1, c3);
     if (v2.y > v3.y) std::swap(v2, v3), std::swap(c2, c3);
 
-    // A nondegenerate triangle has nonzero total height after sorting.
+    int32_t y_begin = validate_cast_boundary(v1.y, target_, "height");
+    int32_t y_end = validate_cast_boundary(v3.y, target_, "height");
+
     float slope2 = (v3.x - v1.x) / (v3.y - v1.y);
 
-    int32_t minY = std::ceil(v1.y - 0.5f);
-    int32_t maxY = std::ceil(v3.y - 0.5f);
-
-    for (int32_t y = minY; y < maxY; y++) {
+    for (int32_t y = y_begin; y < y_end; y++) {
         float x1;
         float sampleY = y + 0.5f;
         // Calculate only the active short edge. For flat tops the upper branch
@@ -76,8 +122,8 @@ void minigpu::CpuRasterizer::draw_triangle_scanLine(const Triangle& triangle) {
         }
         float x2 = v1.x + slope2 * (sampleY - v1.y);
         if (x1 > x2) std::swap(x1, x2);
-        int32_t x_begin = std::ceil(x1 - 0.5f);
-        int32_t x_end = std::ceil(x2 - 0.5f);
+        int32_t x_begin = validate_cast_boundary(x1, target_, "width");
+        int32_t x_end = validate_cast_boundary(x2, target_, "width");
 
         for (int32_t x = x_begin; x < x_end; ++x) {
             auto bc = barycentric(v1, v2, v3, {x + 0.5f, sampleY, 0.0f});

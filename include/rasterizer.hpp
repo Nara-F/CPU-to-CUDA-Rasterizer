@@ -11,7 +11,7 @@ class CpuRasterizer {
     void draw_triangle(const Triangle& triangle);
     void draw_triangle_scanLine(const Triangle& triangle);
     void draw_clear(Color color) { target_.clear(color); }
-    void export_ppm(const std::filesystem::path& path);
+    void export_ppm(const Framebuffer& fb, const std::filesystem::path& path);
 
    private:
     Framebuffer& target_;

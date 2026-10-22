@@ -197,6 +197,7 @@ int main() {
         test_framebuffer_clear(fb, gen);
         TemporaryDirectory directory;
         test_framebuffer_write_ppm(fb, directory.path());
+        test_frambuffer_set_pixel(fb, gen);
 
         minigpu::Framebuffer patterned(3, 2);
         for (std::uint32_t y = 0; y < patterned.height(); ++y) {

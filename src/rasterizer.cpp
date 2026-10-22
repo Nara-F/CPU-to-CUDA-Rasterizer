@@ -88,7 +88,8 @@ void minigpu::CpuRasterizer::draw_triangle_scanLine(const Triangle& triangle) {
 
 }  // scanLine implementation
 
-void export_ppm(const Framebuffer& fb, const std::filesystem::path& path) {
+void CpuRasterizer::export_ppm(const Framebuffer& fb,
+                               const std::filesystem::path& path) {
     fb.write_ppm(path);
 }
 

@@ -1,10 +1,10 @@
+#include "framebuffer.hpp"
+
 #include <algorithm>
 #include <fstream>
 #include <limits>
 #include <stdexcept>
 #include <string>
-
-#include "framebuffer.hpp"
 
 namespace minigpu {
 
@@ -31,6 +31,12 @@ const Color& Framebuffer::at(std::uint32_t x, std::uint32_t y) const {
 
 void Framebuffer::clear(Color color) {
     std::fill(pixels_.begin(), pixels_.end(), color);
+}
+
+void Framebuffer::set_pixel(std::uint32_t x, std::uint32_t y, Color color) {
+    if (x >= width_ || y >= height_)
+        return;  // Ignore out-of-bounds pixels instead of throwing an exception
+    at(x, y) = color;
 }
 
 void Framebuffer::write_ppm(const std::filesystem::path& path) const {

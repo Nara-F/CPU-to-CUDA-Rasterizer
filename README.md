@@ -2,7 +2,7 @@
 
 从 CPU 软件光栅器到 CUDA 分块光栅器的双人项目。通过可复现的正确性与性能实验，解释 GPU 并行和空间分块分别解决了什么问题。
 
-**当前状态：课程脚手架。** 已提供构建入口、PPM 图片输出和小型 OBJ 资产；光栅化、MVP、深度测试、OBJ 解析和 CUDA 算法由 lab 实现。背景图片输出不代表已完成渲染器，未实现的后端必须明确报错。
+**当前进度：Lab02 CPU 三角形光栅化。** 已实现基础数学、framebuffer / PPM 输出、重心坐标包围盒光栅化、扫描线光栅化、top-left 覆盖规则和顶点 RGB 插值。MVP、深度测试、OBJ 解析及 CUDA 算法将在后续 lab 实现。
 
 ## 开始
 
@@ -15,6 +15,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
 ./build/minigpu --output starter.ppm
+./build/minigpu --backend cpu --width 256 --height 256 --output lab02.ppm
 ```
 
 Windows PowerShell（Visual Studio / MSVC）：
@@ -24,11 +25,16 @@ cmake -S . -B build -G "Visual Studio 17 2022"
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 .\build\Release\minigpu.exe --output starter.ppm
+.\build\Release\minigpu.exe --backend cpu --width 256 --height 256 --output lab02.ppm
 ```
 
 Windows 与 WSL 可以共用源码，但必须使用不同的构建目录；CMake 缓存记录了系统路径、编译器和生成器，不能跨系统复用。Visual Studio 生成器需要通过 `--config` 和 `-C` 指定配置，`CMAKE_BUILD_TYPE` 不控制它的构建配置。若已构建 Debug，测试时使用 `-C Debug`。
 
-默认 `--backend starter` 仅输出背景；`--backend cpu`、`cuda-naive`、`cuda-tiled` 是后续 lab 的实现入口，当前明确报错。用 `--help` 查看尺寸和输出参数。
+默认 `--backend starter` 仅输出背景。`--backend cpu` 绘制两个彩色三角形，分别使用重心坐标和扫描线实现，拼成铺满画面的矩形；共享顶点使用相同颜色，对角线上的颜色连续。`cuda-naive`、`cuda-tiled` 尚未实现，调用会明确报错。用 `--help` 查看尺寸和输出参数。
+
+Lab02 测试覆盖单三角形、六种顶点排列、退化三角形、像素中心与平边、拼接矩形无裂缝及无重复覆盖、固定像素的 RGB 插值，以及非有限坐标的预期异常。三角形测试会在构建目录的 `testPPM/` 下输出两种实现的插值图片，并自动创建该目录。
+
+绘制接口接收屏幕空间顶点：像素中心为 `(x+0.5, y+0.5)`；有限坐标超出画面时，仅遍历画面内的部分；任一顶点的 x/y/z 为 NaN 或无穷时抛出 `std::runtime_error`，退化三角形直接跳过。边界转换先以 `double` 取整并限制到 `[0, width]` / `[0, height]`，再转整数，循环采用 `< end`。当前循环索引要求宽高不超过 `INT32_MAX`。RGB 使用屏幕空间重心插值，三个顶点的 alpha 必须相同；尚未实现深度测试和透视正确插值。
 
 CUDA 阶段需要 NVIDIA GPU 和 CUDA Toolkit：
 
@@ -43,15 +49,19 @@ PPM 是为减少依赖选择的图片格式；最终展示可另行导出 PNG。
 include/minigpu.hpp          最小共享类型和接口
 src/main.cpp                CLI
 src/framebuffer.cpp         背景与 PPM 输出（B）
-src/rasterizer.cpp           CPU 光栅化 TODO（B）
+src/math.cpp                 基础向量 / 矩阵运算（A）
+src/raster_math.cpp          重心坐标、包围盒与 top-left 覆盖（A）
+src/rasterizer.cpp           CPU 包围盒 / 扫描线光栅化与颜色插值（B）
 src/cuda_backend.cu          可选 CUDA TODO（A）
 tests/smoke.cpp              starter 冒烟测试
+tests/raster_math_test.cpp   光栅数学与覆盖规则测试
+tests/triangle_test.cpp      两种 CPU 实现的覆盖、颜色与异常测试
 assets/cube.obj              三角化 cube
 labs/README.md              每周任务和验收
 docs/performance-report.md  最终报告模板
 ```
 
-A 的数学模块、B 的 OBJ 与 benchmark 模块在对应 lab 再添加，避免预先堆放空文件。
+OBJ 与 benchmark 模块在对应 lab 再添加，避免预先堆放空文件。
 
 ## 合作方式
 

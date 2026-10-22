@@ -63,7 +63,20 @@ int main(int argc, char** argv) {
             rasterizer.draw_clear({24, 32, 48, 255});
         } else if (backend == "cpu") {
             minigpu::CpuRasterizer rasterizer(framebuffer);
-            rasterizer.draw_triangle({});
+            const float screen_width = static_cast<float>(width);
+            const float screen_height = static_cast<float>(height);
+            const minigpu::ScreenVertex top_left{
+                {0, 0, 0.5f}, {255, 0, 0, 255}};
+            const minigpu::ScreenVertex top_right{
+                {screen_width, 0, 0.5f}, {0, 255, 0, 255}};
+            const minigpu::ScreenVertex bottom_left{
+                {0, screen_height, 0.5f}, {0, 0, 255, 255}};
+            const minigpu::ScreenVertex bottom_right{
+                {screen_width, screen_height, 0.5f}, {255, 255, 255, 255}};
+            const minigpu::Triangle triangle1{top_left, top_right, bottom_left};
+            const minigpu::Triangle triangle2{top_right, bottom_right, bottom_left};
+            rasterizer.draw_triangle(triangle1);
+            rasterizer.draw_triangle_scanLine(triangle2);
         } else if (backend == "cuda-naive") {
             minigpu::run_cuda_demo(framebuffer);
         } else if (backend == "cuda-tiled") {
@@ -74,7 +87,7 @@ int main(int argc, char** argv) {
         }
         framebuffer.write_ppm(output);
         std::cout << "Wrote " << output << " (" << width << "x" << height
-                  << ", " << backend << " starter)\n";
+                  << ", " << backend << ")\n";
     } catch (const std::exception& error) {
         std::cerr << "minigpu: " << error.what() << '\n';
         return 1;

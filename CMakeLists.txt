@@ -56,4 +56,8 @@ if(BUILD_TESTING)
   add_executable(minigpu_raster_math_test tests/raster_math_test.cpp)
   target_link_libraries(minigpu_raster_math_test PRIVATE minigpu_core)
   add_test(NAME minigpu_raster_math_test COMMAND minigpu_raster_math_test)
+
+  add_executable(minigpu_triangle_test tests/triangle_test.cpp)
+  target_link_libraries(minigpu_triangle_test PRIVATE minigpu_core)
+  add_test(NAME minigpu_triangle_test COMMAND minigpu_triangle_test)
 endif()

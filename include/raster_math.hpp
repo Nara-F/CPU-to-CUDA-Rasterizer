@@ -31,4 +31,18 @@ ScreenBounds triangle_bounds(const Triangle& t);
 
 bool cover_pixel(const Triangle& t, const Vec3& p);
 
+// 裁剪体判定：坐标有限、w > 0，且 -w <= x,y,z <= w。
+bool is_inside_clip(const Vec4& clip);
+
+// 透视除法 + viewport 映射。返回 false 表示顶点被裁剪拒绝，此时 screen 不变。
+// screen.z 是归一化深度 (ndc_z + 1) / 2，近 0 远 1。
+bool clip_to_screen(const Vec4& clip, std::uint32_t width,
+                    std::uint32_t height, Vec3& screen);
+
+// 契约：不做完整齐次裁剪。三个顶点都在裁剪体内才返回 true 并写入屏幕坐标；
+// 任一越界则整三角形丢弃，所有输出参数保持不变。
+bool project_triangle(const Vec4& a, const Vec4& b, const Vec4& c,
+                      std::uint32_t width, std::uint32_t height,
+                      Vec3& screen_a, Vec3& screen_b, Vec3& screen_c);
+
 }  // namespace minigpu

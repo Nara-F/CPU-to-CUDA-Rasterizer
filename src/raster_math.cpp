@@ -1,6 +1,7 @@
 #include "raster_math.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace minigpu {
 
@@ -62,6 +63,43 @@ bool cover_pixel(const Triangle& t, const Vec3& p) {
     return inside_edge(edge_function(b, c, p), b, c, sign) &&
            inside_edge(edge_function(c, a, p), c, a, sign) &&
            inside_edge(edge_function(a, b, p), a, b, sign);
+}
+
+bool is_inside_clip(const Vec4& clip) {
+    if (!std::isfinite(clip.x) || !std::isfinite(clip.y) ||
+        !std::isfinite(clip.z) || !std::isfinite(clip.w))
+        return false;
+    if (!(clip.w > 0.0f)) return false;
+
+    const float w = clip.w;
+    return clip.x >= -w && clip.x <= w && clip.y >= -w && clip.y <= w &&
+           clip.z >= -w && clip.z <= w;
+}
+
+bool clip_to_screen(const Vec4& clip, std::uint32_t width,
+                    std::uint32_t height, Vec3& screen) {
+    if (!is_inside_clip(clip)) return false;
+
+    const float inv_w = 1.0f / clip.w;
+    const float ndc_x = clip.x * inv_w;
+    const float ndc_y = clip.y * inv_w;
+    const float ndc_z = clip.z * inv_w;
+
+    screen.x = (ndc_x + 1.0f) * 0.5f * static_cast<float>(width);
+    screen.y = (1.0f - ndc_y) * 0.5f * static_cast<float>(height);
+    screen.z = (ndc_z + 1.0f) * 0.5f;
+    return true;
+}
+
+bool project_triangle(const Vec4& a, const Vec4& b, const Vec4& c,
+                      std::uint32_t width, std::uint32_t height,
+                      Vec3& screen_a, Vec3& screen_b, Vec3& screen_c) {
+    // 契约：任一顶点越界则整三角形丢弃。先全部判定，再写输出。
+    if (!is_inside_clip(a) || !is_inside_clip(b) || !is_inside_clip(c))
+        return false;
+    return clip_to_screen(a, width, height, screen_a) &&
+           clip_to_screen(b, width, height, screen_b) &&
+           clip_to_screen(c, width, height, screen_c);
 }
 
 }  // namespace minigpu

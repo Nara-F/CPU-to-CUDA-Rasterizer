@@ -1,5 +1,6 @@
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -215,6 +216,64 @@ void test_two_triangles_fill_rectangle() {
           "共享对角线上的像素应归 t2");
 }
 
+void test_clip_rejection() {
+    check(minigpu::is_inside_clip({0.0f, 0.0f, 0.0f, 1.0f}),
+          "origin is inside the clip volume");
+    check(minigpu::is_inside_clip({1.0f, 1.0f, -1.0f, 1.0f}),
+          "clip boundary counts as inside");
+    check(!minigpu::is_inside_clip({1.01f, 0.0f, 0.0f, 1.0f}),
+          "outside x is rejected");
+    check(!minigpu::is_inside_clip({0.0f, 0.0f, 0.0f, 0.0f}),
+          "w must be positive");
+    check(!minigpu::is_inside_clip({0.0f, 0.0f, 0.0f, -1.0f}),
+          "negative w is rejected");
+
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    check(!minigpu::is_inside_clip({nan, 0.0f, 0.0f, 1.0f}),
+          "NaN is rejected");
+}
+
+void test_viewport_mapping() {
+    minigpu::Vec3 screen{};
+
+    check(minigpu::clip_to_screen({0.0f, 0.0f, 0.0f, 1.0f}, 256, 256, screen),
+          "center is accepted");
+    check_close(screen.x, 128.0f, "center x");
+    check_close(screen.y, 128.0f, "center y");
+    check_close(screen.z, 0.5f, "center depth");
+
+    check(minigpu::clip_to_screen({-1.0f, 1.0f, -1.0f, 1.0f}, 256, 256,
+                                  screen),
+          "top-left corner is accepted");
+    check_close(screen.x, 0.0f, "top-left x");
+    check_close(screen.y, 0.0f, "top-left y");
+    check_close(screen.z, 0.0f, "near plane maps to depth 0");
+
+    screen.x = -999.0f;
+    check(!minigpu::clip_to_screen({2.0f, 0.0f, 0.0f, 1.0f}, 256, 256,
+                                   screen),
+          "outside vertex is rejected");
+    check_close(screen.x, -999.0f, "a rejected call leaves output untouched");
+}
+
+void test_project_triangle() {
+    minigpu::Vec3 a{};
+    minigpu::Vec3 b{};
+    minigpu::Vec3 c{};
+
+    check(minigpu::project_triangle({-1.0f, -1.0f, 0.0f, 1.0f},
+                                    {1.0f, -1.0f, 0.0f, 1.0f},
+                                    {0.0f, 1.0f, 0.0f, 1.0f}, 256, 256, a, b,
+                                    c),
+          "all vertices inside");
+
+    check(!minigpu::project_triangle({-1.0f, -1.0f, 0.0f, 1.0f},
+                                     {2.0f, -1.0f, 0.0f, 1.0f},
+                                     {0.0f, 1.0f, 0.0f, 1.0f}, 256, 256, a, b,
+                                     c),
+          "one outside vertex rejects the whole triangle");
+}
+
 }  // namespace
 
 int main() {
@@ -229,6 +288,9 @@ int main() {
         test_coverage();
         test_reversed_winding();
         test_two_triangles_fill_rectangle();
+        test_clip_rejection();
+        test_viewport_mapping();
+        test_project_triangle();
     } catch (const std::exception& error) {
         std::cerr << "raster_math_test: " << error.what() << '\n';
         return 1;

@@ -188,11 +188,93 @@ void test_normalize_rejects_zero_length() {
     check(thrown, "normalize of the zero vector must throw std::invalid_argument");
 }
 
+void test_look_at() {
+    // 相机在原点朝 +Z、up = +Y：视图矩阵就是单位矩阵。
+    check_close(minigpu::look_at({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f},
+                                 {0.0f, 1.0f, 0.0f}),
+                minigpu::Mat4{}, "look_at from origin along +Z");
+
+    // 相机在 (0,0,-5) 看原点：原点在相机前方 5 单位，相机位置映到原点。
+    const minigpu::Mat4 view = minigpu::look_at(
+        {0.0f, 0.0f, -5.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f});
+    check_close(view * minigpu::Vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                minigpu::Vec4{0.0f, 0.0f, 5.0f, 1.0f},
+                "origin is 5 units in front of the camera");
+    check_close(view * minigpu::Vec4{0.0f, 0.0f, -5.0f, 1.0f},
+                minigpu::Vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                "eye maps to the view-space origin");
+
+    // 相机在 (0,0,-5) 朝 +X 看：只测"朝 +Z"抓不到基向量的手性错误。
+    const minigpu::Mat4 view_x = minigpu::look_at(
+        {0.0f, 0.0f, -5.0f}, {5.0f, 0.0f, -5.0f}, {0.0f, 1.0f, 0.0f});
+    check_close(view_x * minigpu::Vec4{5.0f, 0.0f, -5.0f, 1.0f},
+                minigpu::Vec4{0.0f, 0.0f, 5.0f, 1.0f},
+                "target is 5 units in front when looking along +X");
+    // 相机右侧是 -Z，所以世界原点在相机的左侧 5 单位。
+    check_close(view_x * minigpu::Vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                minigpu::Vec4{-5.0f, 0.0f, 0.0f, 1.0f},
+                "world +Z lies to the camera's left");
+}
+
+void test_perspective() {
+    const float near_plane = 1.0f;
+    const float far_plane = 10.0f;
+    const minigpu::Mat4 projection =
+        minigpu::perspective(minigpu::degrees(90.0f), 1.0f, near_plane,
+                             far_plane);
+
+    // w_clip = z_view，所以 NDC = clip / z_view。
+    const minigpu::Vec4 near_clip =
+        projection * minigpu::Vec4{0.0f, 0.0f, near_plane, 1.0f};
+    check_close(near_clip.w, near_plane, "w_clip equals z_view");
+    check_close(near_clip.z / near_clip.w, -1.0f, "near maps to NDC z = -1");
+
+    const minigpu::Vec4 far_clip =
+        projection * minigpu::Vec4{0.0f, 0.0f, far_plane, 1.0f};
+    check_close(far_clip.z / far_clip.w, 1.0f, "far maps to NDC z = +1");
+
+    // 90 度 FOV、aspect = 1 时，z 处的可视半宽等于 z。
+    const minigpu::Vec4 edge =
+        projection * minigpu::Vec4{1.0f, 0.0f, 1.0f, 1.0f};
+    check_close(edge.x / edge.w, 1.0f, "90 degree FOV maps x = z to NDC x = 1");
+
+    // aspect = 2：同样的 x 映射到 NDC 的一半，可视宽度翻倍。
+    const minigpu::Mat4 wide =
+        minigpu::perspective(minigpu::degrees(90.0f), 2.0f, near_plane,
+                             far_plane);
+    const minigpu::Vec4 wide_edge =
+        wide * minigpu::Vec4{2.0f, 0.0f, 1.0f, 1.0f};
+    check_close(wide_edge.x / wide_edge.w, 1.0f,
+                "aspect scales the visible width");
+}
+
+void test_rotation_y() {
+    check_close(minigpu::rotation_y(minigpu::degrees(0.0f)), minigpu::Mat4{},
+                "rotation by zero is the identity");
+
+    check_close(minigpu::rotation_y(minigpu::degrees(90.0f)) *
+                    minigpu::Vec4{1.0f, 0.0f, 0.0f, 1.0f},
+                minigpu::Vec4{0.0f, 0.0f, -1.0f, 1.0f},
+                "90 degrees sends +X to -Z");
+}
+
+void test_angle_units() {
+    check_close(minigpu::degrees(180.0f).value, minigpu::kPi,
+                "180 degrees equals pi");
+    check_close(minigpu::degrees(90.0f).value, minigpu::kPi * 0.5f,
+                "90 degrees equals pi/2");
+    check_close(minigpu::radians(1.5f).value, 1.5f, "radians passes through");
+}
+
 }  // namespace
 
 int main() {
     try {
         test_identity();
+        test_look_at();
+        test_perspective();
+        test_rotation_y();
+        test_angle_units();
         test_translation();
         test_translation_composition();
         test_column_major_layout();

@@ -117,6 +117,44 @@ void test_translation_composition() {
                 "translations compose by adding their offsets");
 }
 
+void test_scaling() {
+    check_close(minigpu::scaling({1.0f, 1.0f, 1.0f}), minigpu::Mat4{},
+                "unit scaling is the identity");
+
+    const minigpu::Mat4 scale = minigpu::scaling({2.0f, 3.0f, 4.0f});
+    check_close(scale * minigpu::Vec4{1.0f, -2.0f, 3.0f, 1.0f},
+                minigpu::Vec4{2.0f, -6.0f, 12.0f, 1.0f},
+                "nonuniform scaling of a point");
+    check_close(scale * minigpu::Vec4{1.0f, -2.0f, 3.0f, 0.0f},
+                minigpu::Vec4{2.0f, -6.0f, 12.0f, 0.0f},
+                "scaling changes directions and preserves w");
+    check_close(scale * minigpu::Vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                minigpu::Vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                "scaling is centered at the origin");
+    check_close(minigpu::scaling({-2.0f, 0.0f, 3.0f}) *
+                    minigpu::Vec4{1.0f, 2.0f, 3.0f, 1.0f},
+                minigpu::Vec4{-2.0f, 0.0f, 9.0f, 1.0f},
+                "negative and zero scales mirror and flatten axes");
+}
+
+void test_model_composition() {
+    const minigpu::Mat4 model =
+        minigpu::translation({5.0f, -1.0f, 8.0f}) *
+        minigpu::rotation_y(minigpu::degrees(90.0f)) *
+        minigpu::scaling({2.0f, 3.0f, 4.0f});
+
+    // (1,2,1) -> S: (2,6,4) -> R: (4,6,-2) -> T: (9,5,6)。
+    check_close(model * minigpu::Vec4{1.0f, 2.0f, 1.0f, 1.0f},
+                minigpu::Vec4{9.0f, 5.0f, 6.0f, 1.0f},
+                "T * R * S scales, rotates, then translates a point");
+    check_close(model * minigpu::Vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                minigpu::Vec4{5.0f, -1.0f, 8.0f, 1.0f},
+                "model translation is not scaled or rotated");
+    check_close(model * minigpu::Vec4{1.0f, 2.0f, 1.0f, 0.0f},
+                minigpu::Vec4{4.0f, 6.0f, -2.0f, 0.0f},
+                "model directions receive scale and rotation only");
+}
+
 void test_column_major_layout() {
     const minigpu::Mat4 t = minigpu::translation({7.0f, 8.0f, 9.0f});
     check_close(t.m[3][0], 7.0f, "translation x lives at m[3][0]");
@@ -277,6 +315,8 @@ int main() {
         test_angle_units();
         test_translation();
         test_translation_composition();
+        test_scaling();
+        test_model_composition();
         test_column_major_layout();
         test_matrix_product();
         test_vector_operations();

@@ -65,6 +65,14 @@ Mat4 translation(const Vec3& v) {
     return result;
 }
 
+Mat4 scaling(const Vec3& scale) {
+    Mat4 result;
+    result.m[0][0] = scale.x;
+    result.m[1][1] = scale.y;
+    result.m[2][2] = scale.z;
+    return result;
+}
+
 Mat4 look_at(const Vec3& eye, const Vec3& target, const Vec3& up) {
     // 左手系、相机朝 +Z：forward 是 +Z，right = up x forward，
     // camera_up = forward x right。视线为零或 up 与视线平行时 normalize 会抛异常。

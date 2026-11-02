@@ -74,13 +74,25 @@ Mat4 look_at(const Vec3& eye, const Vec3& target, const Vec3& up);
 // 函数检查 aspect > 0 且 0 < near_plane < far_plane，否则抛
 // std::invalid_argument。w_clip = z_view，除以 w 后近面 NDC z = -1，
 // 远面 NDC z = +1；viewport 再将深度映射到 [0,1]。
-Mat4 perspective(Radians fov_y, float aspect, float near_plane, float far_plane);
+Mat4 perspective(Radians fov_y, float aspect, float near_plane,
+                 float far_plane);
 
-// 旋转矩阵 R：angle 为绕 +Y 轴、以原点为中心的旋转角，单位为弧度，
-// 用 degrees(...) 或 radians(...) 构造。正 90 度将 +X 转向 -Z：
+// 旋转矩阵 R：均以原点为中心，angle 单位为弧度，
+// 用 degrees(...) 或 radians(...) 构造，保持齐次分量 w 不变。
+// 绕 +X 轴，正 90 度将 +Y 转向 +Z：
+//   y' = cos·y - sin·z
+//   z' = sin·y + cos·z
+Mat4 rotation_x(Radians angle);
+
+// 绕 +Y 轴，正 90 度将 +X 转向 -Z：
 //   x' = cos·x + sin·z
 //   z' = -sin·x + cos·z
 Mat4 rotation_y(Radians angle);
+
+// 绕 +Z 轴，正 90 度将 +X 转向 +Y：
+//   x' = cos·x - sin·y
+//   y' = sin·x + cos·y
+Mat4 rotation_z(Radians angle);
 
 // 矩阵乘法，矩阵和列向量乘法
 Mat4 operator*(const Mat4& a, const Mat4& b);

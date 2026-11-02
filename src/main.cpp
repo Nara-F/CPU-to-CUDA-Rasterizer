@@ -10,12 +10,13 @@
 
 namespace {
 void usage(const char* name) {
-    std::cerr << "Usage: " << name
-              << " [--help] [--output PATH] [--width N] [--height N] "
-                 "[--backend starter|cpu|cuda-naive|cuda-tiled] "
-                 "[--scene cube|triangles] [--angle DEGREES] [--reverse-order]\n"
-              << "CPU defaults to cube at 30 degrees; --angle and "
-                 "--reverse-order apply to cube.\n";
+    std::cerr
+        << "Usage: " << name
+        << " [--help] [--output PATH] [--width N] [--height N] "
+           "[--backend starter|cpu|cuda-naive|cuda-tiled] "
+           "[--scene cube|triangles] [--angle DEGREES] [--reverse-order]\n"
+        << "CPU defaults to cube at 30 degrees; --angle and "
+           "--reverse-order apply to cube.\n";
 }
 
 std::uint32_t parse_dimension(const std::string& text, const char* option) {
@@ -89,10 +90,11 @@ int main(int argc, char** argv) {
         } else if (backend == "cpu") {
             minigpu::CpuRasterizer rasterizer(framebuffer);
             if (scene == "cube") {
-                const auto model = minigpu::rotation_y(minigpu::degrees(angle));
-                const auto view = minigpu::look_at(
-                    {3.0f, 2.0f, -6.0f}, {0.0f, 0.0f, 0.0f},
-                    {0.0f, 1.0f, 0.0f});
+                const auto model = minigpu::scaling({1.5f, 1.1f, 0.7f}) *
+                                   minigpu::rotation_y(minigpu::degrees(angle));
+                const auto view =
+                    minigpu::look_at({3.0f, 2.0f, -6.0f}, {0.0f, 0.0f, 0.0f},
+                                     {0.0f, 1.0f, 0.0f});
                 const auto projection = minigpu::perspective(
                     minigpu::degrees(60.0f),
                     static_cast<float>(width) / static_cast<float>(height),
@@ -106,18 +108,18 @@ int main(int argc, char** argv) {
             } else {
                 const float screen_width = static_cast<float>(width);
                 const float screen_height = static_cast<float>(height);
-                const minigpu::ScreenVertex top_left{
-                    {0, 0, 0.5f}, {255, 0, 0, 255}};
-                const minigpu::ScreenVertex top_right{
-                    {screen_width, 0, 0.5f}, {0, 255, 0, 255}};
+                const minigpu::ScreenVertex top_left{{0, 0, 0.5f},
+                                                     {255, 0, 0, 255}};
+                const minigpu::ScreenVertex top_right{{screen_width, 0, 0.5f},
+                                                      {0, 255, 0, 255}};
                 const minigpu::ScreenVertex bottom_left{
                     {0, screen_height, 0.5f}, {0, 0, 255, 255}};
                 const minigpu::ScreenVertex bottom_right{
                     {screen_width, screen_height, 0.5f}, {255, 255, 255, 255}};
-                const minigpu::Triangle triangle1{
-                    top_left, top_right, bottom_left};
-                const minigpu::Triangle triangle2{
-                    top_right, bottom_right, bottom_left};
+                const minigpu::Triangle triangle1{top_left, top_right,
+                                                  bottom_left};
+                const minigpu::Triangle triangle2{top_right, bottom_right,
+                                                  bottom_left};
                 rasterizer.draw_triangle(triangle1);
                 rasterizer.draw_triangle_scanLine(triangle2);
             }

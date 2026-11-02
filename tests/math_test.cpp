@@ -117,6 +117,44 @@ void test_translation_composition() {
                 "translations compose by adding their offsets");
 }
 
+void test_scaling() {
+    check_close(minigpu::scaling({1.0f, 1.0f, 1.0f}), minigpu::Mat4{},
+                "unit scaling is the identity");
+
+    const minigpu::Mat4 scale = minigpu::scaling({2.0f, 3.0f, 4.0f});
+    check_close(scale * minigpu::Vec4{1.0f, -2.0f, 3.0f, 1.0f},
+                minigpu::Vec4{2.0f, -6.0f, 12.0f, 1.0f},
+                "nonuniform scaling of a point");
+    check_close(scale * minigpu::Vec4{1.0f, -2.0f, 3.0f, 0.0f},
+                minigpu::Vec4{2.0f, -6.0f, 12.0f, 0.0f},
+                "scaling changes directions and preserves w");
+    check_close(scale * minigpu::Vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                minigpu::Vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                "scaling is centered at the origin");
+    check_close(minigpu::scaling({-2.0f, 0.0f, 3.0f}) *
+                    minigpu::Vec4{1.0f, 2.0f, 3.0f, 1.0f},
+                minigpu::Vec4{-2.0f, 0.0f, 9.0f, 1.0f},
+                "negative and zero scales mirror and flatten axes");
+}
+
+void test_model_composition() {
+    const minigpu::Mat4 model =
+        minigpu::translation({5.0f, -1.0f, 8.0f}) *
+        minigpu::rotation_y(minigpu::degrees(90.0f)) *
+        minigpu::scaling({2.0f, 3.0f, 4.0f});
+
+    // (1,2,1) -> S: (2,6,4) -> R: (4,6,-2) -> T: (9,5,6)。
+    check_close(model * minigpu::Vec4{1.0f, 2.0f, 1.0f, 1.0f},
+                minigpu::Vec4{9.0f, 5.0f, 6.0f, 1.0f},
+                "T * R * S scales, rotates, then translates a point");
+    check_close(model * minigpu::Vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                minigpu::Vec4{5.0f, -1.0f, 8.0f, 1.0f},
+                "model translation is not scaled or rotated");
+    check_close(model * minigpu::Vec4{1.0f, 2.0f, 1.0f, 0.0f},
+                minigpu::Vec4{4.0f, 6.0f, -2.0f, 0.0f},
+                "model directions receive scale and rotation only");
+}
+
 void test_column_major_layout() {
     const minigpu::Mat4 t = minigpu::translation({7.0f, 8.0f, 9.0f});
     check_close(t.m[3][0], 7.0f, "translation x lives at m[3][0]");
@@ -248,6 +286,19 @@ void test_perspective() {
                 "aspect scales the visible width");
 }
 
+void test_rotation_x() {
+    check_close(minigpu::rotation_x(minigpu::degrees(0.0f)), minigpu::Mat4{},
+                "X rotation by zero is the identity");
+
+    const minigpu::Vec4 point{2.0f, 3.0f, 4.0f, 1.0f};
+    check_close(minigpu::rotation_x(minigpu::degrees(90.0f)) * point,
+                minigpu::Vec4{2.0f, -4.0f, 3.0f, 1.0f},
+                "X rotation by +90 preserves x and sends +Y to +Z");
+    check_close(minigpu::rotation_x(minigpu::degrees(-90.0f)) * point,
+                minigpu::Vec4{2.0f, 4.0f, -3.0f, 1.0f},
+                "X rotation by -90 reverses the rotation");
+}
+
 void test_rotation_y() {
     check_close(minigpu::rotation_y(minigpu::degrees(0.0f)), minigpu::Mat4{},
                 "rotation by zero is the identity");
@@ -256,6 +307,50 @@ void test_rotation_y() {
                     minigpu::Vec4{1.0f, 0.0f, 0.0f, 1.0f},
                 minigpu::Vec4{0.0f, 0.0f, -1.0f, 1.0f},
                 "90 degrees sends +X to -Z");
+}
+
+void test_rotation_z() {
+    check_close(minigpu::rotation_z(minigpu::degrees(0.0f)), minigpu::Mat4{},
+                "Z rotation by zero is the identity");
+
+    const minigpu::Vec4 point{2.0f, 3.0f, 4.0f, 1.0f};
+    check_close(minigpu::rotation_z(minigpu::degrees(90.0f)) * point,
+                minigpu::Vec4{-3.0f, 2.0f, 4.0f, 1.0f},
+                "Z rotation by +90 preserves z and sends +X to +Y");
+    check_close(minigpu::rotation_z(minigpu::degrees(-90.0f)) * point,
+                minigpu::Vec4{3.0f, -2.0f, 4.0f, 1.0f},
+                "Z rotation by -90 reverses the rotation");
+}
+
+void test_rotation_properties() {
+    using Rotation = minigpu::Mat4 (*)(minigpu::Radians);
+    const Rotation rotations[] = {minigpu::rotation_x, minigpu::rotation_y,
+                                  minigpu::rotation_z};
+    for (const auto rotation : rotations) {
+        const auto matrix = rotation(minigpu::degrees(37.0f));
+        check_close(matrix * rotation(minigpu::degrees(-37.0f)),
+                    minigpu::Mat4{}, "opposite rotations cancel");
+        check_close(matrix * minigpu::Vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                    minigpu::Vec4{0.0f, 0.0f, 0.0f, 1.0f},
+                    "rotation leaves the origin fixed");
+
+        for (const float w : {0.0f, 1.0f}) {
+            const auto rotated = matrix * minigpu::Vec4{1.0f, 2.0f, 2.0f, w};
+            check_close(rotated.w, w, "rotation preserves homogeneous w");
+            check_close(minigpu::length({rotated.x, rotated.y, rotated.z}),
+                        3.0f, "rotation preserves vector length");
+        }
+    }
+}
+
+void test_rotation_composition() {
+    const auto x = minigpu::rotation_x(minigpu::degrees(90.0f));
+    const auto z = minigpu::rotation_z(minigpu::degrees(90.0f));
+    const minigpu::Vec4 y_axis{0.0f, 1.0f, 0.0f, 0.0f};
+    check_close((z * x) * y_axis, minigpu::Vec4{0.0f, 0.0f, 1.0f, 0.0f},
+                "Rz * Rx applies X rotation before Z rotation");
+    check_close((x * z) * y_axis, minigpu::Vec4{-1.0f, 0.0f, 0.0f, 0.0f},
+                "swapping X and Z rotations changes the result");
 }
 
 void test_angle_units() {
@@ -273,10 +368,16 @@ int main() {
         test_identity();
         test_look_at();
         test_perspective();
+        test_rotation_x();
         test_rotation_y();
+        test_rotation_z();
+        test_rotation_properties();
+        test_rotation_composition();
         test_angle_units();
         test_translation();
         test_translation_composition();
+        test_scaling();
+        test_model_composition();
         test_column_major_layout();
         test_matrix_product();
         test_vector_operations();

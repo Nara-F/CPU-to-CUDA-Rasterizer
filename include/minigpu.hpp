@@ -8,4 +8,5 @@
 #include "math.hpp"
 #include "raster_math.hpp"
 #include "rasterizer.hpp"
+#include "scene.hpp"
 #include "types.hpp"

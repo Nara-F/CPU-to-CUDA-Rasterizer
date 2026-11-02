@@ -1,7 +1,7 @@
+#include "math.hpp"
+
 #include <cmath>
 #include <stdexcept>
-
-#include "math.hpp"
 
 namespace minigpu {
 
@@ -21,8 +21,7 @@ float dot(const Vec3& a, const Vec3& b) {
 }
 
 Vec3 cross(const Vec3& a, const Vec3& b) {
-    return {a.y * b.z - a.z * b.y,
-            a.z * b.x - a.x * b.z,
+    return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z,
             a.x * b.y - a.y * b.x};
 }
 
@@ -30,7 +29,10 @@ float length(const Vec3& v) { return std::sqrt(dot(v, v)); }
 
 Vec3 normalize(const Vec3& v) {
     const float lenth = length(v);
-    if (lenth == 0.0f) { throw std::invalid_argument("a zero-length vector cannot be normalized"); }
+    if (lenth == 0.0f) {
+        throw std::invalid_argument(
+            "a zero-length vector cannot be normalized");
+    }
     return {v.x / lenth, v.y / lenth, v.z / lenth};
 }
 
@@ -65,9 +67,18 @@ Mat4 translation(const Vec3& v) {
     return result;
 }
 
+Mat4 scaling(const Vec3& scale) {
+    Mat4 result;
+    result.m[0][0] = scale.x;
+    result.m[1][1] = scale.y;
+    result.m[2][2] = scale.z;
+    return result;
+}
+
 Mat4 look_at(const Vec3& eye, const Vec3& target, const Vec3& up) {
     // 左手系、相机朝 +Z：forward 是 +Z，right = up x forward，
-    // camera_up = forward x right。视线为零或 up 与视线平行时 normalize 会抛异常。
+    // camera_up = forward x right。视线为零或 up 与视线平行时 normalize
+    // 会抛异常。
     const Vec3 forward = normalize(target - eye);
     const Vec3 right = normalize(cross(up, forward));
     const Vec3 camera_up = cross(forward, right);
@@ -96,8 +107,7 @@ Mat4 look_at(const Vec3& eye, const Vec3& target, const Vec3& up) {
 
 Mat4 perspective(Radians fov_y, float aspect, float near_plane,
                  float far_plane) {
-    if (!(aspect > 0.0f) || !(near_plane > 0.0f) ||
-        !(far_plane > near_plane)) {
+    if (!(aspect > 0.0f) || !(near_plane > 0.0f) || !(far_plane > near_plane)) {
         throw std::invalid_argument(
             "perspective requires aspect > 0 and 0 < near < far");
     }
@@ -116,6 +126,20 @@ Mat4 perspective(Radians fov_y, float aspect, float near_plane,
     return result;
 }
 
+Mat4 rotation_x(Radians angle) {
+    const float c = std::cos(angle.value);
+    const float s = std::sin(angle.value);
+
+    Mat4 result = zero_matrix();
+    result.m[0][0] = 1.0f;
+    result.m[1][1] = c;
+    result.m[2][2] = c;
+    result.m[3][3] = 1.0f;
+    result.m[2][1] = -s;  // 列 2、行 1
+    result.m[1][2] = s;   // 列 1、行 2
+    return result;
+}
+
 Mat4 rotation_y(Radians angle) {
     const float c = std::cos(angle.value);
     const float s = std::sin(angle.value);
@@ -127,6 +151,20 @@ Mat4 rotation_y(Radians angle) {
     result.m[3][3] = 1.0f;
     result.m[2][0] = s;   // 列 2、行 0
     result.m[0][2] = -s;  // 列 0、行 2
+    return result;
+}
+
+Mat4 rotation_z(Radians angle) {
+    const float c = std::cos(angle.value);
+    const float s = std::sin(angle.value);
+
+    Mat4 result = zero_matrix();
+    result.m[0][0] = c;
+    result.m[1][1] = c;
+    result.m[2][2] = 1.0f;
+    result.m[3][3] = 1.0f;
+    result.m[1][0] = -s;  // 列 1、行 0
+    result.m[0][1] = s;   // 列 0、行 1
     return result;
 }
 

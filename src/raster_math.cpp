@@ -71,9 +71,14 @@ bool is_inside_clip(const Vec4& clip) {
         return false;
     if (!(clip.w > 0.0f)) return false;
 
+    // 投影矩阵乘法在近 / 远面附近会引入约 1 ULP 的误差。严格比较会把
+    // "正好贴在边界上"的顶点（例如 z_view = near）误判为越界；这里给
+    // 相对 w 的 1e-6 容差，边界仍然算在裁剪体内。
     const float w = clip.w;
-    return clip.x >= -w && clip.x <= w && clip.y >= -w && clip.y <= w &&
-           clip.z >= -w && clip.z <= w;
+    const float tolerance = 1e-6f * w;
+    return clip.x >= -w - tolerance && clip.x <= w + tolerance &&
+           clip.y >= -w - tolerance && clip.y <= w + tolerance &&
+           clip.z >= -w - tolerance && clip.z <= w + tolerance;
 }
 
 bool clip_to_screen(const Vec4& clip, std::uint32_t width,

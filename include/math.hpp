@@ -70,9 +70,8 @@ Mat4 look_at(const Vec3& eye, const Vec3& target, const Vec3& up);
 // aspect 为画面宽 / 高，调用方须使用浮点除法。
 // near_plane / far_plane 为沿相机 +Z 轴到近 / 远裁剪面的正距离，
 // 单位与相机坐标相同；它们不是 NDC 深度值，也不是到相机的欧氏距离。
-// 调用方须保证所有参数有限且 0 < fov_y.value < kPi。
-// 函数检查 aspect > 0 且 0 < near_plane < far_plane，否则抛
-// std::invalid_argument。w_clip = z_view，除以 w 后近面 NDC z = -1，
+// 函数检查 0 < fov_y < pi、aspect > 0、0 < near_plane < far_plane，
+// 任一不满足抛 std::invalid_argument。w_clip = z_view，除以 w 后近面 NDC z = -1，
 // 远面 NDC z = +1；viewport 再将深度映射到 [0,1]。
 Mat4 perspective(Radians fov_y, float aspect, float near_plane,
                  float far_plane);

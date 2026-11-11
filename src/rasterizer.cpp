@@ -38,7 +38,8 @@ bool has_invalid_vertex(const minigpu::Triangle& triangle) {
         !std::isfinite(b.x) || !std::isfinite(b.y) || !std::isfinite(b.z);
     bool badC =
         !std::isfinite(c.x) || !std::isfinite(c.y) || !std::isfinite(c.z);
-    return badA || badB || badC;
+    return badA || badB || badC || a.z < 0.0f || a.z > 1.0f ||
+           b.z < 0.0f || b.z > 1.0f || c.z < 0.0f || c.z > 1.0f;
 }
 
 int32_t validate_cast_boundary(float value, uint32_t extent) {
@@ -56,6 +57,24 @@ int32_t validate_cast_boundary(float value, uint32_t extent) {
 
 }  // namespace
 namespace minigpu {
+
+void CpuRasterizer::shade_pixel(const Triangle& triangle, std::uint32_t x,
+                                std::uint32_t y) {
+    const auto bc = barycentric(triangle.a.position, triangle.b.position,
+                                triangle.c.position,
+                                {x + 0.5f, y + 0.5f, 0.0f});
+    // NDC 深度在屏幕空间线性插值，无需再次做透视校正。
+    // 以 a 为基准插值差值，确保三个顶点等深时结果仍精确等深，
+    // 避免重心权重求和的舍入误差让后提交的共面三角形覆盖先提交者。
+    // 顶点深度已验证在 [0,1]，clamp 仅处理插值的浮点舍入误差。
+    const float depth = std::clamp(
+        triangle.a.position.z +
+            (triangle.b.position.z - triangle.a.position.z) * bc.w1 +
+            (triangle.c.position.z - triangle.a.position.z) * bc.w2,
+        0.0f, 1.0f);
+    const auto color = interpolate_color(triangle, bc);
+    target_.depth_test_and_set_pixel(x, y, depth, color);
+}
 
 void CpuRasterizer::draw_triangle(const Triangle& triangle) {
     if (has_invalid_vertex(triangle)) {
@@ -75,11 +94,7 @@ void CpuRasterizer::draw_triangle(const Triangle& triangle) {
         for (int32_t x = x_begin; x < x_end; ++x) {
             Vec3 p{x + 0.5f, y + 0.5f, 0.0f};
             if (minigpu::cover_pixel(triangle, p)) {
-                auto bc = minigpu::barycentric(triangle.a.position,
-                                               triangle.b.position,
-                                               triangle.c.position, p);
-                auto c = interpolate_color(triangle, bc);
-                target_.set_pixel(x, y, c);
+                shade_pixel(triangle, x, y);
             }
         }
     }
@@ -90,17 +105,15 @@ void minigpu::CpuRasterizer::draw_triangle_scanLine(const Triangle& triangle) {
         throw std::runtime_error("Triangle has invalid vertex");
     }
 
-    auto [v1, c1] = triangle.a;
-    auto [v2, c2] = triangle.b;
-    auto [v3, c3] = triangle.c;
+    auto v1 = triangle.a.position;
+    auto v2 = triangle.b.position;
+    auto v3 = triangle.c.position;
 
     if (is_degenerate(triangle)) return;
 
-    if (v1.y > v2.y) std::swap(v1, v2), std::swap(c1, c2);
-    if (v1.y > v3.y) std::swap(v1, v3), std::swap(c1, c3);
-    if (v2.y > v3.y) std::swap(v2, v3), std::swap(c2, c3);
-
-    auto newTri = Triangle{{v1, c1}, {v2, c2}, {v3, c3}};
+    if (v1.y > v2.y) std::swap(v1, v2);
+    if (v1.y > v3.y) std::swap(v1, v3);
+    if (v2.y > v3.y) std::swap(v2, v3);
 
     int32_t y_begin = validate_cast_boundary(v1.y, target_.height());
     int32_t y_end = validate_cast_boundary(v3.y, target_.height());
@@ -126,9 +139,8 @@ void minigpu::CpuRasterizer::draw_triangle_scanLine(const Triangle& triangle) {
         int32_t x_end = validate_cast_boundary(x2, target_.width());
 
         for (int32_t x = x_begin; x < x_end; ++x) {
-            auto bc = barycentric(v1, v2, v3, {x + 0.5f, sampleY, 0.0f});
-            auto c = interpolate_color(newTri, bc);
-            target_.set_pixel(x, y, c);
+            // 保留原始顶点顺序插值，使两种实现的等深判定一致。
+            shade_pixel(triangle, x, y);
         }
     }
 

@@ -24,7 +24,7 @@ if(MINIGPU_ENABLE_CUDA)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
 add_library(minigpu_core src/framebuffer.cpp src/math.cpp src/raster_math.cpp
-                          src/rasterizer.cpp)
+                          src/rasterizer.cpp src/scene.cpp)
 target_include_directories(minigpu_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(minigpu_core PUBLIC cxx_std_17)
 
@@ -60,4 +60,8 @@ if(BUILD_TESTING)
   add_executable(minigpu_triangle_test tests/triangle_test.cpp)
   target_link_libraries(minigpu_triangle_test PRIVATE minigpu_core)
   add_test(NAME minigpu_triangle_test COMMAND minigpu_triangle_test)
+
+  add_executable(minigpu_depth_test tests/depth_test.cpp)
+  target_link_libraries(minigpu_depth_test PRIVATE minigpu_core)
+  add_test(NAME minigpu_depth_test COMMAND minigpu_depth_test)
 endif()

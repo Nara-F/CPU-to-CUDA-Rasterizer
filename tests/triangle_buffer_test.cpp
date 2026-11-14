@@ -18,7 +18,8 @@ void check(bool condition, const std::string& message) {
 }
 
 void check_close(float actual, float expected, const std::string& message) {
-    if (std::fabs(actual - expected) > kTolerance) {
+    if (!std::isfinite(actual) || !std::isfinite(expected) ||
+        std::fabs(actual - expected) > kTolerance) {
         std::ostringstream error;
         error << message << ": expected " << expected << ", got " << actual;
         throw std::runtime_error(error.str());
@@ -127,6 +128,34 @@ void test_drops_whole_triangle_when_one_vertex_is_outside() {
     check(buffer.empty(), "one outside vertex drops the whole triangle");
 }
 
+void test_clip_plane_triangles_can_be_rasterized() {
+    const minigpu::Mat4 projection =
+        minigpu::perspective(minigpu::degrees(90.0f), 1.0f, 1.0f, 10.0f);
+    for (float z : {1.0f, 10.0f}) {
+        minigpu::Mesh mesh = unit_triangle_mesh();
+        for (auto& position : mesh.positions) position.z = z;
+        const auto buffer =
+            minigpu::build_screen_triangles(projection, mesh, 100, 100);
+        check(buffer.triangle_count() == 1, "clip plane triangle kept");
+        const auto* vertices = buffer.triangle(0);
+        const minigpu::Triangle triangle{vertices[0], vertices[1], vertices[2]};
+        for (const auto& vertex : buffer.vertices) {
+            check(vertex.position.z >= 0.0f && vertex.position.z <= 1.0f,
+                  "clip plane depth must stay in [0,1]");
+        }
+
+        minigpu::Framebuffer barycentric_fb(100, 100);
+        minigpu::Framebuffer scanline_fb(100, 100);
+        minigpu::CpuRasterizer(barycentric_fb).draw_triangle(triangle);
+        minigpu::CpuRasterizer(scanline_fb).draw_triangle_scanLine(triangle);
+        const float expected_depth = z == 1.0f ? 0.0f : 1.0f;
+        check_close(barycentric_fb.depth_at(50, 50), expected_depth,
+                    "barycentric rasterizer draws clip plane triangle");
+        check_close(scanline_fb.depth_at(50, 50), expected_depth,
+                    "scanline rasterizer draws clip plane triangle");
+    }
+}
+
 void test_rejects_invalid_mesh() {
     minigpu::Mesh bad_count = unit_triangle_mesh();
     bad_count.indices = {0, 1};
@@ -222,6 +251,7 @@ int main() {
         test_preserves_order_and_flat_color();
         test_vertex_colors_are_preserved();
         test_drops_whole_triangle_when_one_vertex_is_outside();
+        test_clip_plane_triangles_can_be_rasterized();
         test_rejects_invalid_mesh();
         test_memcpy_round_trip();
         test_matches_hardcoded_cube();

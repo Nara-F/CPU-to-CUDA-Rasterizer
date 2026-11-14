@@ -10,15 +10,6 @@
 
 namespace minigpu {
 
-// 网格输入：OBJ loader 或场景构造器的输出。
-// colors 为空表示没有顶点颜色，构建时按三角形序号确定性配色；
-// 非空时必须与 positions 等长。indices 每 3 个一组，0 基，必须全部有效。
-struct Mesh {
-    std::vector<Vec3> positions;
-    std::vector<Color> colors;
-    std::vector<std::uint32_t> indices;
-};
-
 // 屏幕空间三角形缓冲：连续、POD、保序，可直接 memcpy / cudaMemcpy 到设备。
 // vertices 每 3 个构成一个三角形；每个顶点已含屏幕 x/y、归一化深度和 RGBA，
 // 设备端不需要矩阵，只负责光栅化。
@@ -46,8 +37,8 @@ static_assert(sizeof(ScreenVertex) == 3 * sizeof(float) + sizeof(Color),
 // 主机端一次完成 P*V*M、有限值与 w > 0 检查、裁剪拒绝、透视除法和 viewport，
 // 输出屏幕空间的连续三角形缓冲，并保持输入三角形顺序（等深判定依赖顺序）。
 // 任一顶点越界则整三角形丢弃。
-// width / height 必须非零；网格非法（颜色数量不匹配、索引数量不是 3 的倍数、
-// 索引越界）抛 std::invalid_argument。
+// width / height 必须非零；网格非法（颜色数量不匹配、索引越界）
+// 抛 std::invalid_argument。
 TriangleBuffer build_screen_triangles(const Mat4& mvp, const Mesh& mesh,
                                       std::uint32_t width,
                                       std::uint32_t height);

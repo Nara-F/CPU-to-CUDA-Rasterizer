@@ -18,7 +18,7 @@ std::vector<Triangle> make_cube_triangles_hardcoded(const Mat4& mvp,
         {-1, -1, 1, 1},  {1, -1, 1, 1},  {1, 1, 1, 1},  {-1, 1, 1, 1},
     }};
     // 每两个三角形组成一个面；从 cube 外侧看，各面保持相同绕序。
-    constexpr std::array<std::array<unsigned, 3>, 12> indices{{
+    constexpr std::array<TriangleIndices, 12> indices{{
         {{0, 2, 1}}, {{0, 3, 2}},  // -Z
         {{4, 5, 6}}, {{4, 6, 7}},  // +Z
         {{0, 4, 7}}, {{0, 7, 3}},  // -X

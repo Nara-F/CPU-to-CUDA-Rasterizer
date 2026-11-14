@@ -16,17 +16,15 @@ constexpr std::array<Color, 6> kPalette{{
 }};
 
 void validate_mesh(const Mesh& mesh) {
-    if (mesh.indices.size() % 3 != 0) {
-        throw std::invalid_argument(
-            "mesh index count must be a multiple of 3");
-    }
     if (!mesh.colors.empty() && mesh.colors.size() != mesh.positions.size()) {
         throw std::invalid_argument(
             "mesh color count must match position count");
     }
-    for (const std::uint32_t index : mesh.indices) {
-        if (index >= mesh.positions.size()) {
-            throw std::invalid_argument("mesh index out of range");
+    for (const TriangleIndices& triangle : mesh.indices) {
+        for (const std::uint32_t index : triangle) {
+            if (index >= mesh.positions.size()) {
+                throw std::invalid_argument("mesh index out of range");
+            }
         }
     }
 }
@@ -52,12 +50,12 @@ TriangleBuffer build_screen_triangles(const Mat4& mvp, const Mesh& mesh,
     }
 
     TriangleBuffer buffer;
-    buffer.vertices.reserve(mesh.indices.size());
-    for (std::size_t triangle = 0; triangle < mesh.indices.size() / 3;
-         ++triangle) {
-        const std::uint32_t ia = mesh.indices[triangle * 3 + 0];
-        const std::uint32_t ib = mesh.indices[triangle * 3 + 1];
-        const std::uint32_t ic = mesh.indices[triangle * 3 + 2];
+    buffer.vertices.reserve(mesh.indices.size() * 3);
+    for (std::size_t triangle = 0; triangle < mesh.indices.size(); ++triangle) {
+        const auto& indices = mesh.indices[triangle];
+        const std::uint32_t ia = indices[0];
+        const std::uint32_t ib = indices[1];
+        const std::uint32_t ic = indices[2];
 
         // 契约：任一顶点越界则整三角形丢弃。
         if (!accepted[ia] || !accepted[ib] || !accepted[ic]) continue;

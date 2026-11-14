@@ -98,11 +98,15 @@ RenderInput RenderEntry::prepare_scene() const {
     return input;
 }
 
-void RenderEntry::run_backend(const Backend& backend) {
+void RenderEntry::render_backend(const Backend& backend, const RenderInput& input) {
     if (!backend) throw std::invalid_argument("render backend is empty");
-    const auto input = prepare_scene();
     framebuffer_.clear(kClearColor);
     backend(framebuffer_, input);
+}
+
+void RenderEntry::run_backend(const Backend& backend) {
+    const auto input = prepare_scene();
+    render_backend(backend, input);
     framebuffer_.write_ppm(options_.output);
     std::cout << "Wrote " << options_.output << " (" << options_.width << "x"
               << options_.height << ", " << options_.backend << ")\n";

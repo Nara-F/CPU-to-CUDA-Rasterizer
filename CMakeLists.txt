@@ -78,9 +78,14 @@ if(BUILD_TESTING)
   target_link_libraries(minigpu_loader_test PRIVATE minigpu_core)
   add_test(NAME minigpu_loader_test COMMAND minigpu_loader_test)
 
-  add_executable(minigpu_golden_comparison_test tests/golden_comparisontest.cpp)
+  add_executable(minigpu_golden_comparison_test tests/golden_comparison_test.cpp)
   target_link_libraries(minigpu_golden_comparison_test PRIVATE minigpu_core)
   add_test(NAME minigpu_golden_comparison_test COMMAND minigpu_golden_comparison_test)
+  set_tests_properties(minigpu_golden_comparison_test PROPERTIES LABELS "golden")
+
+  add_executable(minigpu_golden_comparison_unit_test tests/golden_comparison_unit_test.cpp)
+  target_link_libraries(minigpu_golden_comparison_unit_test PRIVATE minigpu_core)
+  add_test(NAME minigpu_golden_comparison_unit_test COMMAND minigpu_golden_comparison_unit_test)
 
   add_executable(minigpu_render_entry_test tests/render_entry_test.cpp)
   target_link_libraries(minigpu_render_entry_test PRIVATE minigpu_core)

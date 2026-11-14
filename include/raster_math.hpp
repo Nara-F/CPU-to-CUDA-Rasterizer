@@ -32,6 +32,8 @@ ScreenBounds triangle_bounds(const Triangle& t);
 bool cover_pixel(const Triangle& t, const Vec3& p);
 
 // 裁剪体判定：坐标有限、w > 0，且 -w <= x,y,z <= w。
+// 边界使用相对 w 的 1e-6 容差，避免投影矩阵的浮点舍入把近 / 远面上的
+// 顶点误判为越界。
 bool is_inside_clip(const Vec4& clip);
 
 // 透视除法 + viewport 映射。返回 false 表示顶点被裁剪拒绝，此时 screen 不变。

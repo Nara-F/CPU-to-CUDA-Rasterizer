@@ -9,4 +9,5 @@
 #include "raster_math.hpp"
 #include "rasterizer.hpp"
 #include "scene.hpp"
+#include "triangle_buffer.hpp"
 #include "types.hpp"

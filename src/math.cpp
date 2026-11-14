@@ -107,9 +107,11 @@ Mat4 look_at(const Vec3& eye, const Vec3& target, const Vec3& up) {
 
 Mat4 perspective(Radians fov_y, float aspect, float near_plane,
                  float far_plane) {
-    if (!(aspect > 0.0f) || !(near_plane > 0.0f) || !(far_plane > near_plane)) {
+    if (!(fov_y.value > 0.0f) || !(fov_y.value < kPi) || !(aspect > 0.0f) ||
+        !(near_plane > 0.0f) || !(far_plane > near_plane)) {
         throw std::invalid_argument(
-            "perspective requires aspect > 0 and 0 < near < far");
+            "perspective requires 0 < fov_y < pi, aspect > 0 and "
+            "0 < near < far");
     }
 
     const float f = 1.0f / std::tan(fov_y.value * 0.5f);

@@ -16,7 +16,8 @@ void check(bool condition, const std::string& message) {
 }
 
 void check_close(float actual, float expected, const std::string& message) {
-    if (std::fabs(actual - expected) > kTolerance) {
+    if (!std::isfinite(actual) || !std::isfinite(expected) ||
+        std::fabs(actual - expected) > kTolerance) {
         std::ostringstream error;
         error << message << ": expected " << expected << ", got " << actual;
         throw std::runtime_error(error.str());
@@ -110,6 +111,30 @@ void test_viewport_edges() {
     check_close(screen.x, 100.0f, "max x");
     check_close(screen.y, 0.0f, "max y (origin top-left)");
     check_close(screen.z, 1.0f, "max depth");
+}
+
+void test_tolerated_clip_boundaries_stay_in_viewport() {
+    for (float edge : {-1.0000005f, 1.0000005f}) {
+        for (const minigpu::Vec4 clip : {
+                 minigpu::Vec4{edge, 0.0f, 0.0f, 1.0f},
+                 minigpu::Vec4{0.0f, edge, 0.0f, 1.0f},
+                 minigpu::Vec4{0.0f, 0.0f, edge, 1.0f}}) {
+            minigpu::Vec3 screen{};
+            check(minigpu::clip_to_screen(clip, 100, 50, screen),
+                  "boundary within tolerance must be accepted");
+            check(screen.x >= 0.0f && screen.x <= 100.0f &&
+                      screen.y >= 0.0f && screen.y <= 50.0f &&
+                      screen.z >= 0.0f && screen.z <= 1.0f,
+                  "tolerated boundary must map inside viewport and depth range");
+        }
+    }
+
+    minigpu::Vec3 screen{12.0f, 23.0f, 0.5f};
+    check(!minigpu::clip_to_screen({0.0f, 0.0f, 1.001f, 1.0f}, 100, 50,
+                                  screen),
+          "boundary beyond tolerance must still be rejected");
+    check(screen.x == 12.0f && screen.y == 23.0f && screen.z == 0.5f,
+          "rejected boundary must leave output unchanged");
 }
 
 void test_perspective_parameter_guards() {
@@ -249,6 +274,7 @@ int main() {
         test_clip_rejects_invalid_w();
         test_near_and_far_map_to_depth_edges();
         test_viewport_edges();
+        test_tolerated_clip_boundaries_stay_in_viewport();
         test_perspective_parameter_guards();
         test_extreme_projection_is_finite();
         test_large_coordinates_stay_finite();

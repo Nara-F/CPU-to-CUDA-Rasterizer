@@ -37,6 +37,7 @@ bool cover_pixel(const Triangle& t, const Vec3& p);
 bool is_inside_clip(const Vec4& clip);
 
 // 透视除法 + viewport 映射。返回 false 表示顶点被裁剪拒绝，此时 screen 不变。
+// 容差内的边界误差在 NDC 中钳制到 [-1,1]，确保输出深度位于 [0,1]。
 // screen.z 是归一化深度 (ndc_z + 1) / 2，近 0 远 1。
 bool clip_to_screen(const Vec4& clip, std::uint32_t width,
                     std::uint32_t height, Vec3& screen);

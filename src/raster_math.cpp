@@ -86,9 +86,11 @@ bool clip_to_screen(const Vec4& clip, std::uint32_t width,
     if (!is_inside_clip(clip)) return false;
 
     const float inv_w = 1.0f / clip.w;
-    const float ndc_x = clip.x * inv_w;
-    const float ndc_y = clip.y * inv_w;
-    const float ndc_z = clip.z * inv_w;
+    // 裁剪判定允许边界舍入误差；映射前将其收回合法 NDC 范围，
+    // 确保屏幕坐标和深度满足光栅器的输入契约。
+    const float ndc_x = std::clamp(clip.x * inv_w, -1.0f, 1.0f);
+    const float ndc_y = std::clamp(clip.y * inv_w, -1.0f, 1.0f);
+    const float ndc_z = std::clamp(clip.z * inv_w, -1.0f, 1.0f);
 
     screen.x = (ndc_x + 1.0f) * 0.5f * static_cast<float>(width);
     screen.y = (1.0f - ndc_y) * 0.5f * static_cast<float>(height);

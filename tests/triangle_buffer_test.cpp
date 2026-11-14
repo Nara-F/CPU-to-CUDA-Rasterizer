@@ -47,7 +47,7 @@ minigpu::Mesh unit_triangle_mesh() {
     minigpu::Mesh mesh;
     mesh.positions = {
         {-0.5f, -0.5f, 0.0f}, {0.5f, -0.5f, 0.0f}, {0.0f, 0.5f, 0.0f}};
-    mesh.indices = {0, 1, 2};
+    mesh.indices = {{0, 1, 2}};
     return mesh;
 }
 
@@ -82,7 +82,7 @@ void test_preserves_order_and_flat_color() {
     mesh.positions = {
         {-0.5f, -0.5f, 0.0f}, {0.0f, -0.5f, 0.0f}, {-0.25f, 0.0f, 0.0f},
         {0.25f, -0.5f, 0.0f}, {0.5f, -0.5f, 0.0f}, {0.375f, 0.0f, 0.0f}};
-    mesh.indices = {0, 1, 2, 3, 4, 5};
+    mesh.indices = {{0, 1, 2}, {3, 4, 5}};
 
     const minigpu::TriangleBuffer buffer = minigpu::build_screen_triangles(
         minigpu::Mat4{}, mesh, 100, 100);
@@ -121,7 +121,7 @@ void test_drops_whole_triangle_when_one_vertex_is_outside() {
     minigpu::Mesh mesh;
     mesh.positions = {
         {-0.5f, -0.5f, 0.0f}, {1.5f, -0.5f, 0.0f}, {0.0f, 0.5f, 0.0f}};
-    mesh.indices = {0, 1, 2};
+    mesh.indices = {{0, 1, 2}};
 
     const minigpu::TriangleBuffer buffer = minigpu::build_screen_triangles(
         minigpu::Mat4{}, mesh, 100, 100);
@@ -157,21 +157,16 @@ void test_clip_plane_triangles_can_be_rasterized() {
 }
 
 void test_rejects_invalid_mesh() {
-    minigpu::Mesh bad_count = unit_triangle_mesh();
-    bad_count.indices = {0, 1};
-    check(throws_invalid_argument([&] {
-              minigpu::build_screen_triangles(minigpu::Mat4{}, bad_count, 10,
-                                              10);
-          }),
-          "index count must be a multiple of 3");
-
-    minigpu::Mesh out_of_range = unit_triangle_mesh();
-    out_of_range.indices = {0, 1, 3};
-    check(throws_invalid_argument([&] {
-              minigpu::build_screen_triangles(minigpu::Mat4{}, out_of_range,
-                                              10, 10);
-          }),
-          "index out of range must throw");
+    for (std::size_t corner = 0; corner < 3; ++corner) {
+        minigpu::Mesh out_of_range = unit_triangle_mesh();
+        out_of_range.indices.push_back({0, 1, 2});
+        out_of_range.indices[1][corner] = 3;
+        check(throws_invalid_argument([&] {
+                  minigpu::build_screen_triangles(minigpu::Mat4{}, out_of_range,
+                                                  10, 10);
+              }),
+              "each index in subsequent triangles must be checked");
+    }
 
     minigpu::Mesh bad_colors = unit_triangle_mesh();
     bad_colors.colors = {{1, 2, 3, 255}};
@@ -213,9 +208,9 @@ void test_matches_hardcoded_cube() {
                       {1.0f, 1.0f, -1.0f},   {-1.0f, 1.0f, -1.0f},
                       {-1.0f, -1.0f, 1.0f},  {1.0f, -1.0f, 1.0f},
                       {1.0f, 1.0f, 1.0f},    {-1.0f, 1.0f, 1.0f}};
-    mesh.indices = {0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 4, 7, 0, 7,
-                    3, 1, 2, 6, 1, 6, 5, 0, 1, 5, 0, 5, 4, 3, 7, 6, 3,
-                    6, 2};
+    mesh.indices = {{0, 2, 1}, {0, 3, 2}, {4, 5, 6}, {4, 6, 7},
+                    {0, 4, 7}, {0, 7, 3}, {1, 2, 6}, {1, 6, 5},
+                    {0, 1, 5}, {0, 5, 4}, {3, 7, 6}, {3, 6, 2}};
 
     const minigpu::Mat4 projection =
         minigpu::perspective(minigpu::degrees(60.0f), 1.0f, 0.1f, 100.0f);

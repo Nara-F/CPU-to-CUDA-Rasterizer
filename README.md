@@ -2,7 +2,7 @@
 
 从 CPU 软件光栅器到 CUDA 分块光栅器的双人项目。通过可复现的正确性与性能实验，解释 GPU 并行和空间分块分别解决了什么问题。
 
-**当前进度：Lab03 三维与深度。** 已实现 M/V/P、裁剪拒绝、透视除法、viewport、CPU Z-buffer 和硬编码索引 cube；保留 Lab02 的重心坐标 / 扫描线光栅化、top-left 覆盖与顶点 RGB 插值。OBJ 解析及 CUDA 算法将在后续 lab 实现。
+**当前进度：Lab04 模型与 CPU 基线进行中。** 已实现 M/V/P、裁剪拒绝、透视除法、viewport、CPU Z-buffer、硬编码索引 cube，以及最小 OBJ 加载和 CPU 渲染入口；保留 Lab02 的重心坐标 / 扫描线光栅化、top-left 覆盖与顶点 RGB 插值。确定性 CPU golden 对比入口已预留，比较逻辑及 CUDA 算法尚未实现。
 
 ## 开始
 
@@ -19,6 +19,7 @@ ctest --test-dir build --output-on-failure
 ./build/minigpu --backend cpu --scene cube --angle 30 --reverse-order --output lab03-reverse.ppm
 cmake -E compare_files lab03.ppm lab03-reverse.ppm
 ./build/minigpu --backend cpu --scene triangles --output lab02.ppm
+./build/minigpu --backend cpu --obj assets/cube.obj --angle 30 --output lab04.ppm
 ```
 
 Windows PowerShell（Visual Studio / MSVC）：
@@ -32,13 +33,16 @@ ctest --test-dir build -C Release --output-on-failure
 .\build\Release\minigpu.exe --backend cpu --scene cube --angle 30 --reverse-order --output lab03-reverse.ppm
 cmake -E compare_files lab03.ppm lab03-reverse.ppm
 .\build\Release\minigpu.exe --backend cpu --scene triangles --output lab02.ppm
+.\build\Release\minigpu.exe --backend cpu --obj assets/cube.obj --angle 30 --output lab04.ppm
 ```
 
 Windows 与 WSL 可以共用源码，但必须使用不同的构建目录；CMake 缓存记录了系统路径、编译器和生成器，不能跨系统复用。Visual Studio 生成器需要通过 `--config` 和 `-C` 指定配置，`CMAKE_BUILD_TYPE` 不控制它的构建配置。若已构建 Debug，测试时使用 `-C Debug`。
 
 默认 `--backend starter` 仅输出背景。`--backend cpu` 默认绘制 cube：8 个局部顶点、12 个索引三角形，按面固定配色，不做背面剔除，由 Z-buffer 保证遮挡。`--angle` 接受有限的角度值（单位为度，默认 30），控制绕 Y 轴的模型旋转；分别以 0、30、60 度导出即可比较姿态。`--reverse-order` 反转 cube 三角形提交顺序，可用上面的命令验证图像一致。这两个参数用于 cube 场景。
 
-当前 cube 场景调用 `make_cube_triangles_hardcoded()`，是 Lab03 内置顶点、索引和面颜色的演示入口。Lab04 将实现 OBJ 加载与接收网格数据的通用变换入口，`cube.obj` 通过该通用入口渲染。
+当前 cube 场景调用 `make_cube_triangles_hardcoded()`，是 Lab03 内置顶点、索引和面颜色的演示入口。`--backend cpu --obj PATH` 自动选择 OBJ 场景，也可显式使用 `--scene obj --obj PATH`。OBJ 通过 `Loader` 加载，再由 `build_screen_triangles()` 生成连续屏幕三角形缓冲；相机和模型变换与 cube 相同，支持 `--angle` 和 `--reverse-order`，无顶点颜色时按原始三角形序号固定配色。模型应位于原点附近且大小接近自带 cube，当前不自动居中或缩放适配。OBJ 场景缺少路径、路径冲突、文件不存在或索引非法时返回非零退出码；当前仅支持 CPU 后端。现有 loader 支持三角形 `f i j k`，尚不支持带斜杠的面索引。
+
+`--backend golden` 是预留的确定性 CPU golden / 后端对比入口。当前明确报 TODO、返回非零退出码且不写出图片；固定场景、参考颜色 / 深度生成及自动比较逻辑留待后续实现。
 
 `--scene triangles` 绘制 Lab02 的两个彩色三角形，分别使用重心坐标和扫描线实现，拼成铺满画面的矩形；共享顶点使用相同颜色，对角线上的颜色连续。`cuda-naive`、`cuda-tiled` 尚未实现，调用会明确报错。用 `--help` 查看尺寸和输出参数。
 
@@ -77,7 +81,7 @@ labs/README.md              每周任务和验收
 docs/performance-report.md  最终报告模板
 ```
 
-OBJ 与 benchmark 模块在对应 lab 再添加，避免预先堆放空文件。
+benchmark 模块在对应 lab 再添加，避免预先堆放空文件。
 
 ## 合作方式
 

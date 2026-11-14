@@ -25,7 +25,7 @@ if(MINIGPU_ENABLE_CUDA)
 endif()
 add_library(minigpu_core src/framebuffer.cpp src/math.cpp src/raster_math.cpp
                           src/rasterizer.cpp src/scene.cpp
-                          src/triangle_buffer.cpp)
+                          src/triangle_buffer.cpp src/loader.cpp)
 target_include_directories(minigpu_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(minigpu_core PUBLIC cxx_std_17)
 
@@ -73,4 +73,8 @@ if(BUILD_TESTING)
   add_executable(minigpu_triangle_buffer_test tests/triangle_buffer_test.cpp)
   target_link_libraries(minigpu_triangle_buffer_test PRIVATE minigpu_core)
   add_test(NAME minigpu_triangle_buffer_test COMMAND minigpu_triangle_buffer_test)
+
+  add_executable(minigpu_loader_test tests/loader_test.cpp)
+  target_link_libraries(minigpu_loader_test PRIVATE minigpu_core)
+  add_test(NAME minigpu_loader_test COMMAND minigpu_loader_test)
 endif()

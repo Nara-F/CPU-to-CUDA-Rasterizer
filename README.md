@@ -42,6 +42,25 @@ Windows 与 WSL 可以共用源码，但必须使用不同的构建目录；CMak
 
 当前 cube 场景调用 `make_cube_triangles_hardcoded()`，是 Lab03 内置顶点、索引和面颜色的演示入口。`--backend cpu --obj PATH` 自动选择 OBJ 场景，也可显式使用 `--scene obj --obj PATH`。OBJ 通过 `Loader` 加载，再由 `build_screen_triangles()` 生成连续屏幕三角形缓冲；相机和模型变换与 cube 相同，支持 `--angle` 和 `--reverse-order`，无顶点颜色时按原始三角形序号固定配色。模型应位于原点附近且大小接近自带 cube，当前不自动居中或缩放适配。OBJ 场景缺少路径、路径冲突、文件不存在或索引非法时返回非零退出码；当前仅支持 CPU 后端。现有 loader 支持三角形 `f i j k`，尚不支持带斜杠的面索引。
 
+CPU 的 cube / OBJ 场景支持以下相机和模型参数，三分量参数使用三个以空格分隔的数值：
+
+| 参数 | 默认值 | 含义 |
+| --- | --- | --- |
+| `--eye X Y Z` | `3 2 -6` | 相机世界坐标 |
+| `--target X Y Z` | `0 0 0` | 世界空间注视点 |
+| `--up X Y Z` | `0 1 0` | 相机参考上方向 |
+| `--fov DEGREES` | `60` | 垂直视场角，单位为度，范围 `(0,180)` |
+| `--near N` | `0.1` | 近裁剪面距离 |
+| `--far N` | `100` | 远裁剪面距离，要求 `0 < near < far` |
+| `--translate X Y Z` | `0 0 0` | 模型世界空间平移 |
+| `--scale X Y Z` | `1.5 1.1 0.7` | 模型各轴缩放倍率 |
+
+所有数值须有限；相机位置不能与注视点重合，up 不能为零或平行于视线。宽高比由输出宽高计算。模型变换保持既有旋转、缩放顺序：`M = T * (S * Ry)`，先绕 Y 轴旋转，再缩放，最后平移；`MVP = P * V * M`。不传新参数时保持原有画面。这些新参数用于 CPU 三维场景，传给 starter、triangles 或 CUDA 后端会明确报错。
+
+```sh
+./build/minigpu --backend cpu --obj assets/cube.obj --eye 4 3 -8 --target 0 0 0 --up 0 1 0 --fov 45 --near 0.1 --far 100 --translate 0.5 0 0 --scale 1 1 1 --angle 30 --output custom.ppm
+```
+
 `--backend golden` 是预留的确定性 CPU golden / 后端对比入口。当前明确报 TODO、返回非零退出码且不写出图片；固定场景、参考颜色 / 深度生成及自动比较逻辑留待后续实现。
 
 `--scene triangles` 绘制 Lab02 的两个彩色三角形，分别使用重心坐标和扫描线实现，拼成铺满画面的矩形；共享顶点使用相同颜色，对角线上的颜色连续。`cuda-naive`、`cuda-tiled` 尚未实现，调用会明确报错。用 `--help` 查看尺寸和输出参数。
@@ -65,7 +84,9 @@ PPM 是为减少依赖选择的图片格式；最终展示可另行导出 PNG。
 
 ```text
 include/minigpu.hpp          最小共享类型和接口
-src/main.cpp                CLI
+src/main.cpp                CLI 参数解析与具体后端选择
+include/render_entry.hpp    RenderOptions、RenderInput 和统一渲染入口
+src/render_entry.cpp        参数校验、场景准备、MVP、渲染调度与 PPM 输出
 src/framebuffer.cpp         颜色 / 深度缓冲与 PPM 输出（B）
 src/math.cpp                 基础向量 / 矩阵运算（A）
 src/raster_math.cpp          重心坐标、包围盒与 top-left 覆盖（A）
@@ -82,6 +103,18 @@ docs/performance-report.md  最终报告模板
 ```
 
 benchmark 模块在对应 lab 再添加，避免预先堆放空文件。
+
+`main` 解析参数后构造 `RenderOptions`，交给 `RenderEntry` 处理。CPU 路径直接注入具体光栅器，入口类无需依赖 `CpuRasterizer`：
+
+```cpp
+minigpu::RenderOptions options;
+options.backend = "cpu";
+minigpu::RenderEntry entry(options);
+minigpu::CpuRasterizer rasterizer(entry.framebuffer());
+entry.run(rasterizer);
+```
+
+批量后端可通过 `entry.run_backend(callback)` 注入；回调接收 framebuffer 和 `RenderInput`（连续屏幕三角形缓冲），文件输出由入口统一完成。当前 CUDA 分支仍调用原有 TODO 演示入口。
 
 ## 合作方式
 

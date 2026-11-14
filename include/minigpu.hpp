@@ -5,6 +5,7 @@
 
 #include "cuda_backend.hpp"
 #include "framebuffer.hpp"
+#include "golden_comparison.hpp"
 #include "loader.hpp"
 #include "math.hpp"
 #include "raster_math.hpp"

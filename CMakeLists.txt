@@ -24,8 +24,8 @@ if(MINIGPU_ENABLE_CUDA)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
 add_library(minigpu_core src/framebuffer.cpp src/math.cpp src/raster_math.cpp
-                          src/rasterizer.cpp src/scene.cpp
-                          src/triangle_buffer.cpp src/loader.cpp)
+                          src/rasterizer.cpp src/scene.cpp src/render_entry.cpp
+                          src/triangle_buffer.cpp src/loader.cpp src/golden_comparison.cpp)
 target_include_directories(minigpu_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(minigpu_core PUBLIC cxx_std_17)
 
@@ -77,4 +77,12 @@ if(BUILD_TESTING)
   add_executable(minigpu_loader_test tests/loader_test.cpp)
   target_link_libraries(minigpu_loader_test PRIVATE minigpu_core)
   add_test(NAME minigpu_loader_test COMMAND minigpu_loader_test)
+
+  add_executable(minigpu_golden_comparison_test tests/golden_comparisontest.cpp)
+  target_link_libraries(minigpu_golden_comparison_test PRIVATE minigpu_core)
+  add_test(NAME minigpu_golden_comparison_test COMMAND minigpu_golden_comparison_test)
+
+  add_executable(minigpu_render_entry_test tests/render_entry_test.cpp)
+  target_link_libraries(minigpu_render_entry_test PRIVATE minigpu_core)
+  add_test(NAME minigpu_render_entry_test COMMAND minigpu_render_entry_test)
 endif()

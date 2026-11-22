@@ -6,42 +6,10 @@
 #include <stdexcept>
 #include <utility>
 
-#include "cuda_backend.hpp"
 #include "raster_math.hpp"
+#include "render_entry.hpp"
 
 namespace {
-minigpu::Color interpolate_color(const minigpu::Triangle& tri,
-                                 const minigpu::Barycentric& bc) {
-    minigpu::Color result;
-    if (tri.a.color.a != tri.b.color.a || tri.a.color.a != tri.c.color.a ||
-        tri.b.color.a != tri.c.color.a) {
-        throw(std::logic_error(
-            "CPU rasterizer does not support alpha interpolation"));
-    }
-    result.a = tri.a.color.a;
-    result.r =
-        tri.a.color.r * bc.w0 + tri.b.color.r * bc.w1 + tri.c.color.r * bc.w2;
-    result.g =
-        tri.a.color.g * bc.w0 + tri.b.color.g * bc.w1 + tri.c.color.g * bc.w2;
-    result.b =
-        tri.a.color.b * bc.w0 + tri.b.color.b * bc.w1 + tri.c.color.b * bc.w2;
-    return result;
-}
-
-bool has_invalid_vertex(const minigpu::Triangle& triangle) {
-    const auto& a = triangle.a.position;
-    const auto& b = triangle.b.position;
-    const auto& c = triangle.c.position;
-    bool badA =
-        !std::isfinite(a.x) || !std::isfinite(a.y) || !std::isfinite(a.z);
-    bool badB =
-        !std::isfinite(b.x) || !std::isfinite(b.y) || !std::isfinite(b.z);
-    bool badC =
-        !std::isfinite(c.x) || !std::isfinite(c.y) || !std::isfinite(c.z);
-    return badA || badB || badC || a.z < 0.0f || a.z > 1.0f ||
-           b.z < 0.0f || b.z > 1.0f || c.z < 0.0f || c.z > 1.0f;
-}
-
 int32_t validate_cast_boundary(float value, uint32_t extent) {
     if (!std::isfinite(value)) {
         throw std::runtime_error("coordinate is not finite");
@@ -58,26 +26,30 @@ int32_t validate_cast_boundary(float value, uint32_t extent) {
 }  // namespace
 namespace minigpu {
 
+void render_cpu(Framebuffer& target, const RenderInput& input) {
+    CpuRasterizer rasterizer(target);
+    for (std::size_t i = 0; i < input.triangles.triangle_count(); ++i) {
+        const auto* vertices = input.triangles.triangle(i);
+        rasterizer.draw_triangle({vertices[0], vertices[1], vertices[2]});
+    }
+}
+
 void CpuRasterizer::shade_pixel(const Triangle& triangle, std::uint32_t x,
                                 std::uint32_t y) {
-    const auto bc = barycentric(triangle.a.position, triangle.b.position,
-                                triangle.c.position,
-                                {x + 0.5f, y + 0.5f, 0.0f});
-    // NDC 深度在屏幕空间线性插值，无需再次做透视校正。
-    // 以 a 为基准插值差值，确保三个顶点等深时结果仍精确等深，
-    // 避免重心权重求和的舍入误差让后提交的共面三角形覆盖先提交者。
-    // 顶点深度已验证在 [0,1]，clamp 仅处理插值的浮点舍入误差。
-    const float depth = std::clamp(
-        triangle.a.position.z +
-            (triangle.b.position.z - triangle.a.position.z) * bc.w1 +
-            (triangle.c.position.z - triangle.a.position.z) * bc.w2,
-        0.0f, 1.0f);
+    const auto bc =
+        barycentric(triangle.a.position, triangle.b.position,
+                    triangle.c.position, {x + 0.5f, y + 0.5f, 0.0f});
+    const float depth = interpolate_depth(triangle, bc);
+    if (!has_uniform_alpha(triangle)) {
+        throw std::logic_error(
+            "CPU rasterizer does not support alpha interpolation");
+    }
     const auto color = interpolate_color(triangle, bc);
     target_.depth_test_and_set_pixel(x, y, depth, color);
 }
 
 void CpuRasterizer::draw_triangle(const Triangle& triangle) {
-    if (has_invalid_vertex(triangle)) {
+    if (!is_valid_screen_triangle(triangle)) {
         throw std::runtime_error("Triangle has invalid vertex");
     }
     if (minigpu::is_degenerate(triangle)) return;
@@ -101,7 +73,7 @@ void CpuRasterizer::draw_triangle(const Triangle& triangle) {
 }
 
 void minigpu::CpuRasterizer::draw_triangle_scanLine(const Triangle& triangle) {
-    if (has_invalid_vertex(triangle)) {
+    if (!is_valid_screen_triangle(triangle)) {
         throw std::runtime_error("Triangle has invalid vertex");
     }
 
@@ -150,13 +122,5 @@ void CpuRasterizer::export_ppm(const Framebuffer& fb,
                                const std::filesystem::path& path) {
     fb.write_ppm(path);
 }
-
-#if !MINIGPU_HAS_CUDA
-void run_cuda_demo(Framebuffer&) {
-    throw std::logic_error(
-        "CUDA backend is unavailable; configure with -DMINIGPU_ENABLE_CUDA=ON "
-        "after installing CUDA");
-}
-#endif
 
 }  // namespace minigpu

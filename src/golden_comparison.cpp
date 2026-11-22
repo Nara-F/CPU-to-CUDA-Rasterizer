@@ -156,8 +156,7 @@ GoldenResult run_golden_comparison(const GoldenOptions& options,
         try {
             RenderEntry entry(render_options);
             const auto input = entry.prepare_scene();
-            CpuRasterizer cpu(entry.framebuffer());
-            entry.render_backend(RenderEntry::with_rasterizer(cpu), input);
+            entry.render_backend(render_cpu, input);
             const Framebuffer reference = entry.framebuffer();
             bool covered = false;
             for (std::uint32_t y = 0; y < reference.height(); ++y)

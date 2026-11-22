@@ -1,3 +1,4 @@
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -29,32 +30,23 @@ struct TemporaryDirectory {
     }
 };
 
-// 验证入口可注入另一个实现，不依赖具体的 CpuRasterizer。
-struct RecordingRasterizer {
-    int triangles = 0;
-    int scanlines = 0;
-    void draw_triangle(const minigpu::Triangle&) { ++triangles; }
-    void draw_triangle_scanLine(const minigpu::Triangle&) { ++scanlines; }
-};
-
-void test_rasterizer_injection(const std::filesystem::path& directory) {
+void test_triangles_and_starter(const std::filesystem::path& directory) {
     minigpu::RenderOptions options;
     options.backend = "cpu";
     options.scene = "triangles";
     options.output = directory / "triangles.ppm";
     minigpu::RenderEntry entry(options);
-    RecordingRasterizer rasterizer;
-    entry.run(rasterizer);
-    check(rasterizer.triangles == 1 && rasterizer.scanlines == 1,
-          "Lab02 must dispatch one triangle to each rasterizer method");
+    entry.run_backend(minigpu::render_cpu);
+    check(entry.framebuffer().depth_at(0, 0) == 0.5f &&
+              entry.framebuffer().depth_at(options.width - 1, options.height - 1) == 0.5f,
+          "CPU backend must draw both triangles");
     check(std::filesystem::exists(options.output), "entry must write output");
 
     options.backend = "starter";
     options.output = directory / "starter.ppm";
     minigpu::RenderEntry starter(options);
-    RecordingRasterizer unused;
-    starter.run(unused);
-    check(unused.triangles == 0 && unused.scanlines == 0,
+    starter.run_backend(minigpu::render_cpu);
+    check(std::isinf(starter.framebuffer().depth_at(0, 0)),
           "starter must only clear the framebuffer");
 }
 
@@ -71,8 +63,7 @@ void test_obj_and_batch_input(const std::filesystem::path& directory) {
     options.transform.fov = 90;
     std::ofstream(options.obj_path) << "v -1 -1 0\nv 1 -1 0\nv 0 1 0\nf 1 2 3\n";
     minigpu::RenderEntry entry(options);
-    minigpu::CpuRasterizer rasterizer(entry.framebuffer());
-    entry.run(rasterizer);
+    entry.run_backend(minigpu::render_cpu);
     check(entry.framebuffer().at(50, 50).r == 230,
           "injected CPU rasterizer must render the prepared OBJ");
     bool called = false;
@@ -81,7 +72,6 @@ void test_obj_and_batch_input(const std::filesystem::path& directory) {
         called = true;
         check(input.triangles.triangle_count() == 1,
               "batch backend must receive prepared screen triangles");
-        check(!input.scanline_second, "OBJ must use normal triangle drawing");
         check(target.at(50, 50).r == 24,
               "each run must clear previous rendering before dispatch");
     });
@@ -109,7 +99,7 @@ void test_failed_backend_does_not_write(const std::filesystem::path& directory) 
 int main() {
     try {
         TemporaryDirectory directory;
-        test_rasterizer_injection(directory.path);
+        test_triangles_and_starter(directory.path);
         test_obj_and_batch_input(directory.path);
         test_failed_backend_does_not_write(directory.path);
     } catch (const std::exception& error) {

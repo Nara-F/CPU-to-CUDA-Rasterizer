@@ -83,7 +83,6 @@ RenderInput RenderEntry::prepare_scene() const {
         const ScreenVertex bottom_right{{width, height, 0.5f}, {255, 255, 255, 255}};
         input.triangles.vertices = {top_left, top_right, bottom_left,
                                     top_right, bottom_right, bottom_left};
-        input.scanline_second = true;
     }
 
     if (options_.reverse_order && options_.scene != "triangles") {

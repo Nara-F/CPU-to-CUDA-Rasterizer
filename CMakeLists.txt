@@ -30,8 +30,12 @@ target_include_directories(minigpu_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/inclu
 target_compile_features(minigpu_core PUBLIC cxx_std_17)
 
 if(MINIGPU_ENABLE_CUDA)
-  target_sources(minigpu_core PRIVATE src/cuda_backend.cu)
+  target_sources(minigpu_core PRIVATE src/cuda_rasterizer.cu)
   target_compile_definitions(minigpu_core PUBLIC MINIGPU_HAS_CUDA=1)
+  # Preserve the separate multiply/subtract rounding used by CPU edge tests.
+  target_compile_options(minigpu_core PRIVATE
+    $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--fmad=false>
+    $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-ffp-contract=off>)
   set_target_properties(minigpu_core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 else()
   target_compile_definitions(minigpu_core PUBLIC MINIGPU_HAS_CUDA=0)

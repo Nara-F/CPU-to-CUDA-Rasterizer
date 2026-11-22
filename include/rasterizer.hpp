@@ -5,6 +5,9 @@
 
 namespace minigpu {
 
+struct RenderInput;
+void render_cpu(Framebuffer& target, const RenderInput& input);
+
 class CpuRasterizer {
    public:
     explicit CpuRasterizer(Framebuffer& target) : target_(target) {}

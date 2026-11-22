@@ -21,10 +21,7 @@ int main(int argc, char** argv) {
         minigpu::RenderEntry::Backend candidate;
         if (cpu_check) {
             std::cout << "Candidate: CPU (comparison/cleanup self-check)\n";
-            candidate = [](minigpu::Framebuffer& target, const minigpu::RenderInput& input) {
-                minigpu::CpuRasterizer cpu(target);
-                minigpu::RenderEntry::with_rasterizer(cpu)(target, input);
-            };
+            candidate = minigpu::render_cpu;
         } else {
             std::cout << "Candidate: CUDA placeholder (empty output; kernel not implemented)\n";
             // CUDA 光栅化尚未实现。显式保留清屏结果，实际比较并报告 100 次失败；

@@ -34,8 +34,6 @@ struct RenderOptions {
 
 struct RenderInput {
     TriangleBuffer triangles;
-    // 保留 Lab02 两种光栅化方法的演示：仅第二个三角形走扫描线。
-    bool scanline_second = false;
 };
 
 // 参数解析由调用方负责；入口负责配置校验、场景准备、渲染和文件输出。
@@ -46,27 +44,6 @@ class RenderEntry {
 
     explicit RenderEntry(RenderOptions options);
     Framebuffer& framebuffer() noexcept { return framebuffer_; }
-
-    // Rasterizer 绑定 framebuffer()，须提供 draw_triangle、
-    // draw_triangle_scanLine。实现对象在调用期间由调用方持有。
-    template <typename Rasterizer>
-    void run(Rasterizer& rasterizer) {
-        run_backend(with_rasterizer(rasterizer));
-    }
-
-    template <typename Rasterizer>
-    static Backend with_rasterizer(Rasterizer& rasterizer) {
-        return [&rasterizer](Framebuffer&, const RenderInput& input) {
-            for (std::size_t i = 0; i < input.triangles.triangle_count(); ++i) {
-                const auto* v = input.triangles.triangle(i);
-                const Triangle triangle{v[0], v[1], v[2]};
-                if (input.scanline_second && i == 1)
-                    rasterizer.draw_triangle_scanLine(triangle);
-                else
-                    rasterizer.draw_triangle(triangle);
-            }
-        };
-    }
 
     // 同一份主机端场景可交给多个后端；内存渲染不导出文件，供 golden 使用。
     RenderInput prepare_scene() const;

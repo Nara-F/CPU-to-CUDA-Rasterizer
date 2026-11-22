@@ -37,8 +37,8 @@ MiniGPU 是一个纯 C++17 的软件光栅器：顶点变换、齐次裁剪判�
 
 | Cube（MVP + Z-buffer） | 三角形插值 | OBJ 加载 |
 | --- | --- | --- |
-| <img src="docs/images/cube.png" width="260" alt="CPU 渲染的 cube"> | <img src="docs/images/triangles.png" width="260" alt="重心坐标与扫描线插值"> | <img src="docs/images/obj.png" width="260" alt="OBJ 三角形渲染"> |
-| `--angle 30` 的 cube；Z-buffer 保证近侧面覆盖远侧面 | 重心坐标与扫描线实现拼成整屏，共享顶点颜色连续 | `assets/cube.obj` 经 loader、MVP 和 perspective divide 后渲染 |
+| <img src="docs/images/cube.png" width="260" alt="CPU 渲染的 cube"> | <img src="docs/images/triangles.png" width="260" alt="双三角形颜色插值"> | <img src="docs/images/obj.png" width="260" alt="OBJ 三角形渲染"> |
+| `--angle 30` 的 cube；Z-buffer 保证近侧面覆盖远侧面 | 两个三角形通过包围盒光栅化拼成整屏，共享边颜色连续 | `assets/cube.obj` 经 loader、MVP 和 perspective divide 后渲染 |
 
 复现演示图：
 
@@ -103,8 +103,8 @@ main.cpp
                  ┌─────────────────┴──────────────────┐
                  │                                    │
           CpuRasterizer                      CUDA backend（规划中）
-          ├─ 包围盒 + 边函数 + top-left        ├─ cuda-naive：一线程一像素
-          └─ 扫描线                            └─ cuda-tiled：16×16 tile
+          └─ 包围盒 + 边函数 + top-left        ├─ cuda-naive：一线程一像素
+                                               └─ cuda-tiled：16×16 tile
                  │
           Framebuffer（颜色 + 深度）→ PPM
 ```

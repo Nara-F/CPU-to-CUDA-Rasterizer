@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "cuda_backend.hpp"
+#include "cuda_rasterizer.hpp"
 #include "framebuffer.hpp"
 #include "golden_comparison.hpp"
 #include "loader.hpp"

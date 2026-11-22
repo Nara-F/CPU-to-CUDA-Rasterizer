@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "cuda_backend.hpp"
+#include "cuda_rasterizer.hpp"
 #include "rasterizer.hpp"
 #include "render_entry.hpp"
 
@@ -50,10 +50,12 @@ float parse_finite(const std::string& text, const char* option) {
     try {
         value = std::stof(text, &consumed);
     } catch (const std::exception&) {
-        throw std::invalid_argument(std::string("invalid finite number for ") + option);
+        throw std::invalid_argument(std::string("invalid finite number for ") +
+                                    option);
     }
     if (consumed != text.size() || !std::isfinite(value))
-        throw std::invalid_argument(std::string("invalid finite number for ") + option);
+        throw std::invalid_argument(std::string("invalid finite number for ") +
+                                    option);
     return value;
 }
 
@@ -107,17 +109,25 @@ int main(int argc, char** argv) {
             else if (arg == "--eye" || arg == "--target" || arg == "--up" ||
                      arg == "--translate" || arg == "--scale") {
                 const auto v = vector_value(arg.c_str());
-                if (arg == "--eye") options.transform.eye = v;
-                else if (arg == "--target") options.transform.target = v;
-                else if (arg == "--up") options.transform.up = v;
-                else if (arg == "--translate") options.transform.translate = v;
-                else options.transform.scale = v;
+                if (arg == "--eye")
+                    options.transform.eye = v;
+                else if (arg == "--target")
+                    options.transform.target = v;
+                else if (arg == "--up")
+                    options.transform.up = v;
+                else if (arg == "--translate")
+                    options.transform.translate = v;
+                else
+                    options.transform.scale = v;
                 options.custom_transform = true;
             } else if (arg == "--fov" || arg == "--near" || arg == "--far") {
                 const float v = parse_finite(value(arg.c_str()), arg.c_str());
-                if (arg == "--fov") options.transform.fov = v;
-                else if (arg == "--near") options.transform.near_plane = v;
-                else options.transform.far_plane = v;
+                if (arg == "--fov")
+                    options.transform.fov = v;
+                else if (arg == "--near")
+                    options.transform.near_plane = v;
+                else
+                    options.transform.far_plane = v;
                 options.custom_transform = true;
             } else if (arg == "--reverse-order")
                 options.reverse_order = true;
@@ -127,16 +137,17 @@ int main(int argc, char** argv) {
             }
         }
 
-        if (!options.obj_path.empty() && !scene_specified) options.scene = "obj";
+        if (!options.obj_path.empty() && !scene_specified)
+            options.scene = "obj";
         minigpu::RenderEntry entry(options);
         if (options.backend == "starter" || options.backend == "cpu") {
-            minigpu::CpuRasterizer rasterizer(entry.framebuffer());
-            entry.run(rasterizer);
+            entry.run_backend(minigpu::render_cpu);
         } else if (options.backend == "cuda-naive") {
-            entry.run_backend([](minigpu::Framebuffer& target,
-                                 const minigpu::RenderInput&) {
-                minigpu::run_cuda_demo(target);
-            });
+#if MINIGPU_HAS_CUDA
+            entry.run_backend(minigpu::render_cuda);
+#else
+            throw std::runtime_error("CUDA backend requires MINIGPU_ENABLE_CUDA=ON");
+#endif
         } else if (options.backend == "cuda-tiled") {
             throw std::logic_error(
                 "tiled CUDA backend is a lab TODO (Weeks 9-10)");

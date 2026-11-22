@@ -45,11 +45,6 @@ std::size_t obj_count(const std::filesystem::path& directory) {
     return count;
 }
 
-void render_cpu(minigpu::Framebuffer& target, const minigpu::RenderInput& input) {
-    minigpu::CpuRasterizer cpu(target);
-    minigpu::RenderEntry::with_rasterizer(cpu)(target, input);
-}
-
 void test_comparator() {
     using namespace minigpu;
     Framebuffer reference(2, 1, {24, 32, 48, 255});
@@ -88,7 +83,7 @@ void test_suite(const std::filesystem::path& directory) {
     options.failure_directory = directory;
     std::ofstream(directory / "keep.txt") << "existing artifact";
     std::ostringstream log;
-    const auto success = minigpu::run_golden_comparison(options, render_cpu, log);
+    const auto success = minigpu::run_golden_comparison(options, minigpu::render_cpu, log);
     check(success.passed == 100 && success.failed == 0 && success.failure_directory.empty(),
           "100 CPU/CPU cases must pass");
     check(std::filesystem::exists(directory / "keep.txt") && obj_count(directory) == 0,
@@ -101,7 +96,7 @@ void test_suite(const std::filesystem::path& directory) {
     int calls = 0;
     const auto mixed = minigpu::run_golden_comparison(options,
         [&](minigpu::Framebuffer& target, const minigpu::RenderInput& input) {
-            if (calls++ % 2 == 0) render_cpu(target, input);
+            if (calls++ % 2 == 0) minigpu::render_cpu(target, input);
         }, log);
     check(calls == 6 && mixed.passed == 3 && mixed.failed == 3,
           "suite must continue after failures and classify each case");
@@ -127,7 +122,7 @@ void test_suite(const std::filesystem::path& directory) {
 
     const auto throwing = minigpu::run_golden_comparison(options,
         [](minigpu::Framebuffer& target, const minigpu::RenderInput& input) {
-            render_cpu(target, input);
+            minigpu::render_cpu(target, input);
             throw std::runtime_error("injected failure");
         }, log);
     check(throwing.failed == 3 && obj_count(throwing.failure_directory) == 3,

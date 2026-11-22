@@ -52,9 +52,9 @@ void Framebuffer::set_pixel(std::uint32_t x, std::uint32_t y, Color color) {
 }
 
 bool Framebuffer::depth_test_and_set_pixel(std::uint32_t x, std::uint32_t y,
-                                          float depth, Color color) {
-    if (x >= width_ || y >= height_ || !std::isfinite(depth) ||
-        depth < 0.0f || depth > 1.0f)
+                                           float depth, Color color) {
+    if (x >= width_ || y >= height_ || !std::isfinite(depth) || depth < 0.0f ||
+        depth > 1.0f)
         return false;
     const std::size_t index = static_cast<std::size_t>(y) * width_ + x;
     if (!(depth < depths_[index])) return false;

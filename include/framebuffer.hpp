@@ -8,6 +8,8 @@
 
 namespace minigpu {
 
+struct RenderInput;
+
 class Framebuffer {
    public:
     Framebuffer(std::uint32_t width, std::uint32_t height, Color clear = {});
@@ -22,11 +24,13 @@ class Framebuffer {
     void set_pixel(std::uint32_t x, std::uint32_t y, Color color);
     // depth 为 [0,1] 中的有限值；严格小于旧深度时一起写入颜色和深度。
     // 等深保留先写入者；越界或非法深度返回 false，不修改缓冲。
-    bool depth_test_and_set_pixel(std::uint32_t x, std::uint32_t y,
-                                  float depth, Color color);
+    bool depth_test_and_set_pixel(std::uint32_t x, std::uint32_t y, float depth,
+                                  Color color);
     void write_ppm(const std::filesystem::path& path) const;
 
    private:
+    friend void render_cuda(Framebuffer& target, const RenderInput& input);
+
     std::uint32_t width_, height_;
     std::vector<Color> pixels_;
     std::vector<float> depths_;
